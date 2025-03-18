@@ -44,6 +44,16 @@ export default class WxRequest {
   private loadingManager: LoadingManager;
   
   /**
+   * 静态工厂方法，创建WxRequest实例
+   * 防止用户忘记使用new关键字
+   * @param config 配置
+   * @returns WxRequest实例
+   */
+  static create(config?: WxRequestConfig): WxRequest {
+    return new WxRequest(config);
+  }
+  
+  /**
    * 构造函数
    * @param config 配置
    */
@@ -106,6 +116,27 @@ export default class WxRequest {
       request: new Interceptor<RequestConfig>(),
       response: new Interceptor<Response>()
     };
+
+    // 绑定所有实例方法以确保正确的this上下文
+    this.request = this.request.bind(this);
+    this.get = this.get.bind(this);
+    this.post = this.post.bind(this);
+    this.put = this.put.bind(this);
+    this.delete = this.delete.bind(this);
+    this.head = this.head.bind(this);
+    this.options = this.options.bind(this);
+    this.batch = this.batch.bind(this);
+    this.preRequest = this.preRequest.bind(this);
+    this.clearCache = this.clearCache.bind(this);
+    this.cancelRequests = this.cancelRequests.bind(this);
+    this.getStatus = this.getStatus.bind(this);
+    this.cancelAll = this.cancelAll.bind(this);
+    this.sendRequest = this.sendRequest.bind(this);
+    this.performRequest = this.performRequest.bind(this);
+    this.handleRequestError = this.handleRequestError.bind(this);
+    this.cacheResponse = this.cacheResponse.bind(this);
+    this.refreshCache = this.refreshCache.bind(this);
+    this.handleLoading = this.handleLoading.bind(this);
   }
   
   /**
@@ -142,80 +173,105 @@ export default class WxRequest {
     methodOrDataOrConfig?: Method | any | RequestConfig,
     configArg?: RequestConfig
   ): Promise<Response<T>> {
-    let config: RequestConfig;
+    // 创建一个安全的this引用
+    const self = this;
+
+    // 检查this上下文是否存在
+    if (!self || !self.defaults) {
+      const instanceError = new Error(
+        '调用WxRequest方法时遇到this上下文丢失问题。\n' +
+        '可能的原因:\n' +
+        '1. 解构调用 - 例如: const {request} = wxRequest;\n' +
+        '2. 单独传递方法 - 例如: const req = wxRequest.request;\n' +
+        '3. 在事件处理函数中调用没有绑定this\n\n' +
+        '正确用法:\n' +
+        '- wxRequest.request(...) // 直接通过实例调用\n' +
+        '- const req = wxRequest.request.bind(wxRequest) // 使用bind绑定\n' +
+        '- const req = (...args) => wxRequest.request(...args) // 使用箭头函数'
+      );
+      console.error(instanceError);
+      throw instanceError;
+    }
     
-    // 处理不同的参数组合
-    if (typeof urlOrConfig === 'string') {
-      // 情况1: request(url, config?)
-      // 情况2: request(url, method, config?)
-      // 情况3: request(url, data, config?)
+    try {
+      let config: RequestConfig;
       
-      config = configArg || (typeof methodOrDataOrConfig === 'object' && !Array.isArray(methodOrDataOrConfig) && !(methodOrDataOrConfig instanceof Date) ? methodOrDataOrConfig : {}) as RequestConfig;
-      config.url = urlOrConfig;
-      
-      if (methodOrDataOrConfig) {
-        if (typeof methodOrDataOrConfig === 'string') {
-          // 如果第二个参数是字符串，认为是HTTP方法
-          config.method = methodOrDataOrConfig as Method;
-        } else if (typeof methodOrDataOrConfig === 'object' || Array.isArray(methodOrDataOrConfig)) {
-          // 如果第二个参数是对象或数组，认为是数据
-          config.data = methodOrDataOrConfig;
-          // 默认为POST
-          config.method = config.method || 'POST';
+      // 处理不同的参数组合
+      if (typeof urlOrConfig === 'string') {
+        // 情况1: request(url, config?)
+        // 情况2: request(url, method, config?)
+        // 情况3: request(url, data, config?)
+        
+        config = configArg || (typeof methodOrDataOrConfig === 'object' && !Array.isArray(methodOrDataOrConfig) && !(methodOrDataOrConfig instanceof Date) ? methodOrDataOrConfig : {}) as RequestConfig;
+        config.url = urlOrConfig;
+        
+        if (methodOrDataOrConfig) {
+          if (typeof methodOrDataOrConfig === 'string') {
+            // 如果第二个参数是字符串，认为是HTTP方法
+            config.method = methodOrDataOrConfig as Method;
+          } else if (typeof methodOrDataOrConfig === 'object' || Array.isArray(methodOrDataOrConfig)) {
+            // 如果第二个参数是对象或数组，认为是数据
+            config.data = methodOrDataOrConfig;
+            // 默认为POST
+            config.method = config.method || 'POST';
+          }
+        } else {
+          // 如果只有URL参数，默认为GET
+          config.method = config.method || 'GET';
         }
       } else {
-        // 如果只有URL参数，默认为GET
-        config.method = config.method || 'GET';
+        // 情况4: request(config)
+        config = urlOrConfig;
       }
-    } else {
-      // 情况4: request(config)
-      config = urlOrConfig;
-    }
 
-    // 合并配置
-    config = deepMerge(this.defaults, config);
-    
-    // 设置默认适配器
-    if (!config.requestAdapter) {
-      config.requestAdapter = wxRequestAdapter;
+      // 合并配置
+      config = deepMerge(self.defaults, config);
+      
+      // 设置默认适配器
+      if (!config.requestAdapter) {
+        config.requestAdapter = wxRequestAdapter;
+      }
+      
+      // 设置缓存适配器
+      if (!config.cacheAdapter) {
+        config.cacheAdapter = self.cacheAdapter;
+      }
+      
+      // 处理请求URL
+      if (config.url) {
+        config.url = buildURL(config.url, config.baseURL, config.params);
+      }
+      
+      // 初始化请求链
+      let chain: Array<any> = [self.sendRequest.bind(self), undefined];
+      
+      // 添加请求拦截器到链前面
+      let requestInterceptorChain: any[] = [];
+      self.interceptors.request.forEach(interceptor => {
+        requestInterceptorChain.unshift(interceptor.fulfilled, interceptor.rejected);
+      });
+      
+      // 添加响应拦截器到链后面
+      let responseInterceptorChain: any[] = [];
+      self.interceptors.response.forEach(interceptor => {
+        responseInterceptorChain.push(interceptor.fulfilled, interceptor.rejected);
+      });
+      
+      // 构建完整请求链
+      chain = [...requestInterceptorChain, ...chain, ...responseInterceptorChain];
+      
+      // 执行请求链
+      let promise = Promise.resolve(config);
+      
+      while (chain.length) {
+        promise = promise.then(chain.shift(), chain.shift());
+      }
+      
+      return promise as Promise<Response<T>>;
+    } catch (error) {
+      console.error('WxRequest.request调用失败:', error);
+      return Promise.reject(error);
     }
-    
-    // 设置缓存适配器
-    if (!config.cacheAdapter) {
-      config.cacheAdapter = this.cacheAdapter;
-    }
-    
-    // 处理请求URL
-    if (config.url) {
-      config.url = buildURL(config.url, config.baseURL, config.params);
-    }
-    
-    // 初始化请求链
-    let chain: Array<any> = [this.sendRequest.bind(this), undefined];
-    
-    // 添加请求拦截器到链前面
-    let requestInterceptorChain: any[] = [];
-    this.interceptors.request.forEach(interceptor => {
-      requestInterceptorChain.unshift(interceptor.fulfilled, interceptor.rejected);
-    });
-    
-    // 添加响应拦截器到链后面
-    let responseInterceptorChain: any[] = [];
-    this.interceptors.response.forEach(interceptor => {
-      responseInterceptorChain.push(interceptor.fulfilled, interceptor.rejected);
-    });
-    
-    // 构建完整请求链
-    chain = [...requestInterceptorChain, ...chain, ...responseInterceptorChain];
-    
-    // 执行请求链
-    let promise = Promise.resolve(config);
-    
-    while (chain.length) {
-      promise = promise.then(chain.shift(), chain.shift());
-    }
-    
-    return promise as Promise<Response<T>>;
   }
   
   /**
@@ -412,6 +468,9 @@ export default class WxRequest {
    * @param config 请求配置
    */
   get<T = any>(url: string, config: RequestConfig = {}): Promise<Response<T>> {
+    if (!this || !this.defaults) {
+      throw new Error('WxRequest实例的this上下文丢失。请使用wxRequest.get()的方式调用，或使用bind绑定上下文。');
+    }
     return this.request<T>({
       ...config,
       method: 'GET',
@@ -426,6 +485,9 @@ export default class WxRequest {
    * @param config 请求配置
    */
   post<T = any>(url: string, data?: any, config: RequestConfig = {}): Promise<Response<T>> {
+    if (!this || !this.defaults) {
+      throw new Error('WxRequest实例的this上下文丢失。请使用wxRequest.post()的方式调用，或使用bind绑定上下文。');
+    }
     return this.request<T>({
       ...config,
       method: 'POST',
@@ -441,6 +503,9 @@ export default class WxRequest {
    * @param config 请求配置
    */
   put<T = any>(url: string, data?: any, config: RequestConfig = {}): Promise<Response<T>> {
+    if (!this || !this.defaults) {
+      throw new Error('WxRequest实例的this上下文丢失。请使用wxRequest.put()的方式调用，或使用bind绑定上下文。');
+    }
     return this.request<T>({
       ...config,
       method: 'PUT',
@@ -455,6 +520,9 @@ export default class WxRequest {
    * @param config 请求配置
    */
   delete<T = any>(url: string, config: RequestConfig = {}): Promise<Response<T>> {
+    if (!this || !this.defaults) {
+      throw new Error('WxRequest实例的this上下文丢失。请使用wxRequest.delete()的方式调用，或使用bind绑定上下文。');
+    }
     return this.request<T>({
       ...config,
       method: 'DELETE',
@@ -468,6 +536,9 @@ export default class WxRequest {
    * @param config 请求配置
    */
   head<T = any>(url: string, config: RequestConfig = {}): Promise<Response<T>> {
+    if (!this || !this.defaults) {
+      throw new Error('WxRequest实例的this上下文丢失。请使用wxRequest.head()的方式调用，或使用bind绑定上下文。');
+    }
     return this.request<T>({
       ...config,
       method: 'HEAD',
@@ -481,6 +552,9 @@ export default class WxRequest {
    * @param config 请求配置
    */
   options<T = any>(url: string, config: RequestConfig = {}): Promise<Response<T>> {
+    if (!this || !this.defaults) {
+      throw new Error('WxRequest实例的this上下文丢失。请使用wxRequest.options()的方式调用，或使用bind绑定上下文。');
+    }
     return this.request<T>({
       ...config,
       method: 'OPTIONS',
@@ -494,6 +568,9 @@ export default class WxRequest {
    * @param config 批处理配置
    */
   batch<T = any>(requests: RequestConfig[], config: RequestConfig = {}): Promise<Response<T>[]> {
+    if (!this || !this.batchManager) {
+      throw new Error('WxRequest实例的this上下文丢失。请使用wxRequest.batch()的方式调用，或使用bind绑定上下文。');
+    }
     return this.batchManager.executeBatch(
       requests.map(req => deepMerge(config, req)),
       this.sendRequest.bind(this)
@@ -505,6 +582,9 @@ export default class WxRequest {
    * @param config 预请求配置
    */
   preRequest(config: RequestConfig & { preloadKey: string }): Promise<void> {
+    if (!this || !this.preloadManager) {
+      throw new Error('WxRequest实例的this上下文丢失。请使用wxRequest.preRequest()的方式调用，或使用bind绑定上下文。');
+    }
     return this.preloadManager.preload(config, this.sendRequest.bind(this));
   }
   
@@ -524,6 +604,9 @@ export default class WxRequest {
    * @param pattern 缓存键模式（暂未实现）
    */
   clearCache(): Promise<void> {
+    if (!this || !this.cacheAdapter) {
+      throw new Error('WxRequest实例的this上下文丢失。请使用wxRequest.clearCache()的方式调用，或使用bind绑定上下文。');
+    }
     return this.cacheAdapter.clear();
   }
   
@@ -532,6 +615,9 @@ export default class WxRequest {
    * @param filter 过滤条件
    */
   cancelRequests(filter: (config: RequestConfig) => boolean): void {
+    if (!this || !this.requestQueue) {
+      throw new Error('WxRequest实例的this上下文丢失。请使用wxRequest.cancelRequests()的方式调用，或使用bind绑定上下文。');
+    }
     this.requestQueue.cancel(filter);
   }
   
@@ -539,6 +625,9 @@ export default class WxRequest {
    * 获取请求库状态
    */
   getStatus() {
+    if (!this || !this.requestQueue || !this.preloadManager) {
+      throw new Error('WxRequest实例的this上下文丢失。请使用wxRequest.getStatus()的方式调用，或使用bind绑定上下文。');
+    }
     return {
       queue: this.requestQueue.getStatus(),
       preload: this.preloadManager.getStatus()
@@ -549,6 +638,9 @@ export default class WxRequest {
    * 取消所有请求和加载提示
    */
   cancelAll(): void {
+    if (!this || !this.loadingManager) {
+      throw new Error('WxRequest实例的this上下文丢失。请使用wxRequest.cancelAll()的方式调用，或使用bind绑定上下文。');
+    }
     // 取消所有请求
     this.cancelRequests(() => true);
     

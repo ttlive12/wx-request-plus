@@ -37,14 +37,17 @@ npm install wx-request-plus --save
 ```typescript
 import WxRequest from 'wx-request-plus';
 
-// 创建请求实例
-const wxRequest = new WxRequest({
+// 创建请求实例 (推荐方式)
+const wxRequest = WxRequest.create({
   baseURL: 'https://api.example.com',
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json'
   }
 });
+
+// 也可以使用构造函数方式
+// const wxRequest = new WxRequest({...});
 
 // 使用Promise方式发起请求
 wxRequest.get('/users')
@@ -421,6 +424,63 @@ wxRequest.interceptors.response.use(
 
 1. 使用我们提供的构建脚本 `./build.sh`
 2. 或手动运行 `npm run build`，它使用了 `--skipLibCheck` 选项跳过类型检查
+
+### this上下文丢失问题
+
+如果您遇到以下错误：
+```
+TypeError: Cannot read property 'defaults' of undefined
+```
+
+这通常是因为调用方法时丢失了this上下文。这是JavaScript中的常见问题，尤其当方法被单独传递或解构时。
+
+#### 错误用法
+
+```javascript
+// ❌ 错误用法1: 解构会丢失this上下文
+const { request, get, post } = wxRequest;
+request('/api/users'); // 错误：this是undefined
+
+// ❌ 错误用法2: 单独传递方法也会丢失this上下文
+const myRequest = wxRequest.request;
+myRequest('/api/users'); // 错误：this是undefined
+
+// ❌ 错误用法3: 在回调函数中没有正确绑定this
+button.onclick = function() {
+  wxRequest.request('/api/data');  // 在某些环境中可能有问题
+};
+```
+
+#### 正确用法
+
+```javascript
+// ✅ 正确用法1: 使用实例直接调用方法
+const wxRequest = WxRequest.create();
+wxRequest.request('/api/users');
+wxRequest.get('/api/users');
+
+// ✅ 正确用法2: 使用bind绑定上下文
+const request = wxRequest.request.bind(wxRequest);
+request('/api/users');
+
+// ✅ 正确用法3: 使用箭头函数封装
+const request = (url, config) => wxRequest.request(url, config);
+request('/api/users');
+
+// ✅ 正确用法4: 在回调中使用箭头函数
+button.onclick = () => {
+  wxRequest.request('/api/data');
+};
+```
+
+#### 最佳实践
+
+为避免this绑定问题，我们推荐：
+
+1. 使用`WxRequest.create()`方法创建实例（而不是`new WxRequest()`）
+2. 总是通过实例直接调用方法，如`wxRequest.request()`
+3. 如果需要传递方法，请使用`bind`或箭头函数
+4. 避免对wxRequest实例进行解构
 
 ## 版本兼容性
 
