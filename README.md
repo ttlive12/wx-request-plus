@@ -62,6 +62,43 @@ wxRequest.get('/config', { cache: true, cacheExpire: 60000 })
   });
 ```
 
+## 多种请求方式
+
+wx-request-plus支持多种灵活的请求方式：
+
+```typescript
+// 方式1: 使用HTTP方法特定的便捷函数
+wxRequest.get('/users');
+wxRequest.post('/users', { name: '张三' });
+wxRequest.put('/users/1', { name: '李四' });
+wxRequest.delete('/users/1');
+
+// 方式2: 使用通用request方法(完整配置对象)
+wxRequest.request({
+  url: '/users',
+  method: 'GET',
+  params: { role: 'admin' }
+});
+
+// 方式3: 只提供URL (默认GET请求)
+wxRequest.request('/users');
+
+// 方式4: 提供URL和请求方法
+wxRequest.request('/users', 'POST');
+
+// 方式5: 提供URL和数据 (默认POST请求)
+wxRequest.request('/users', { name: '张三' });
+
+// 方式6: 提供URL和配置
+wxRequest.request('/users', { params: { role: 'admin' } });
+
+// 方式7: 提供URL、请求方法和配置
+wxRequest.request('/users', 'GET', { params: { role: 'admin' } });
+
+// 方式8: 提供URL、数据和配置
+wxRequest.request('/users', { name: '张三' }, { timeout: 5000 });
+```
+
 ## 加载提示
 
 wx-request-plus 支持在请求过程中自动显示和隐藏加载提示，无需手动管理 wx.showLoading 和 wx.hideLoading。

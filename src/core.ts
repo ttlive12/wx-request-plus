@@ -3,7 +3,8 @@ import {
   RequestConfig,
   Response,
   RequestError,
-  LoadingOptions
+  LoadingOptions,
+  Method
 } from './types';
 import Interceptor from './interceptor';
 import LRUCacheAdapter from './adapters/cache';
@@ -112,7 +113,65 @@ export default class WxRequest {
    * @param config 请求配置
    * @returns Promise
    */
-  request<T = any>(config: RequestConfig): Promise<Response<T>> {
+  request<T = any>(config: RequestConfig): Promise<Response<T>>;
+  /**
+   * 发送请求
+   * @param url 请求URL
+   * @param config 请求配置（可选）
+   * @returns Promise
+   */
+  request<T = any>(url: string, config?: RequestConfig): Promise<Response<T>>;
+  /**
+   * 发送请求
+   * @param url 请求URL
+   * @param method 请求方法
+   * @param config 请求配置（可选）
+   * @returns Promise
+   */
+  request<T = any>(url: string, method: Method, config?: RequestConfig): Promise<Response<T>>;
+  /**
+   * 发送请求
+   * @param url 请求URL
+   * @param data 请求数据
+   * @param config 请求配置（可选）
+   * @returns Promise
+   */
+  request<T = any>(url: string, data: any, config?: RequestConfig): Promise<Response<T>>;
+  request<T = any>(
+    urlOrConfig: string | RequestConfig,
+    methodOrDataOrConfig?: Method | any | RequestConfig,
+    configArg?: RequestConfig
+  ): Promise<Response<T>> {
+    let config: RequestConfig;
+    
+    // 处理不同的参数组合
+    if (typeof urlOrConfig === 'string') {
+      // 情况1: request(url, config?)
+      // 情况2: request(url, method, config?)
+      // 情况3: request(url, data, config?)
+      
+      config = configArg || (typeof methodOrDataOrConfig === 'object' && !Array.isArray(methodOrDataOrConfig) && !(methodOrDataOrConfig instanceof Date) ? methodOrDataOrConfig : {}) as RequestConfig;
+      config.url = urlOrConfig;
+      
+      if (methodOrDataOrConfig) {
+        if (typeof methodOrDataOrConfig === 'string') {
+          // 如果第二个参数是字符串，认为是HTTP方法
+          config.method = methodOrDataOrConfig as Method;
+        } else if (typeof methodOrDataOrConfig === 'object' || Array.isArray(methodOrDataOrConfig)) {
+          // 如果第二个参数是对象或数组，认为是数据
+          config.data = methodOrDataOrConfig;
+          // 默认为POST
+          config.method = config.method || 'POST';
+        }
+      } else {
+        // 如果只有URL参数，默认为GET
+        config.method = config.method || 'GET';
+      }
+    } else {
+      // 情况4: request(config)
+      config = urlOrConfig;
+    }
+
     // 合并配置
     config = deepMerge(this.defaults, config);
     
