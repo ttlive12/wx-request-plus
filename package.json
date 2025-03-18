@@ -1,0 +1,47 @@
+{
+  "name": "wx-request-plus",
+  "version": "1.0.0",
+  "description": "增强型微信小程序请求库，支持错误处理、Promise、缓存、弱网处理、请求队列等功能",
+  "main": "dist/index.js",
+  "types": "types/index.d.ts",
+  "scripts": {
+    "build": "gulp build",
+    "build:strict": "gulp build --strict",
+    "watch": "gulp watch",
+    "clean": "gulp clean",
+    "type-check": "tsc --noEmit",
+    "prepublish": "npm run build",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "miniprogram": "dist",
+  "keywords": [
+    "微信",
+    "小程序",
+    "wx.request",
+    "request",
+    "fetch",
+    "http",
+    "promise",
+    "cache",
+    "offline",
+    "queue"
+  ],
+  "author": "Vinky",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.4.5",
+    "miniprogram-api-typings": "^4.0.0",
+    "gulp": "^4.0.2",
+    "gulp-typescript": "^6.0.0-alpha.1",
+    "gulp-sourcemaps": "^3.0.0",
+    "gulp-clean": "^0.4.0",
+    "del": "^6.1.1"
+  },
+  "dependencies": {
+    "lru-cache": "^7.18.3"
+  },
+  "files": [
+    "dist",
+    "types"
+  ]
+}
