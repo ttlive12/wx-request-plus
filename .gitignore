@@ -2,6 +2,7 @@
 /dist
 /lib
 /es
+/types
 
 # 依赖目录
 /node_modules
