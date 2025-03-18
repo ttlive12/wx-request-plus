@@ -1,4 +1,4 @@
-import { WxRequestConfig, RequestConfig, Response } from './types';
+import { WxRequestConfig, RequestConfig, Response, Method } from './types';
 import Interceptor from './interceptor';
 export default class WxRequest {
     private defaults;
@@ -10,9 +10,14 @@ export default class WxRequest {
     private requestQueue;
     private batchManager;
     private preloadManager;
+    private loadingManager;
     constructor(config?: WxRequestConfig);
     request<T = any>(config: RequestConfig): Promise<Response<T>>;
+    request<T = any>(url: string, config?: RequestConfig): Promise<Response<T>>;
+    request<T = any>(url: string, method: Method, config?: RequestConfig): Promise<Response<T>>;
+    request<T = any>(url: string, data: any, config?: RequestConfig): Promise<Response<T>>;
     private sendRequest;
+    private handleLoading;
     private performRequest;
     private handleRequestError;
     private cacheResponse;
@@ -46,4 +51,5 @@ export default class WxRequest {
             keys: string[];
         };
     };
+    cancelAll(): void;
 }

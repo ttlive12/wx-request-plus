@@ -1,5 +1,11 @@
 export type Method = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'HEAD' | 'OPTIONS' | 'TRACE' | 'CONNECT';
 export type CacheMode = boolean | 'force-cache' | 'only-if-cached' | 'no-cache';
+export interface LoadingOptions {
+    title?: string;
+    mask?: boolean;
+    delay?: number;
+    customLoader?: (show: boolean, options?: LoadingOptions) => void;
+}
 export interface RequestConfig {
     url?: string;
     baseURL?: string;
@@ -18,6 +24,8 @@ export interface RequestConfig {
     cancelOnNavigate?: boolean;
     ignoreQueue?: boolean;
     groupKey?: string;
+    batchConfig?: Partial<BatchConfig>;
+    showLoading?: boolean | LoadingOptions;
     transformRequest?: (data: any, headers: Record<string, string>) => any;
     transformResponse?: (data: any, response: Response) => any;
     validateStatus?: (status: number) => boolean;
@@ -44,6 +52,11 @@ export interface WxRequestConfig extends RequestConfig {
     enableOfflineQueue?: boolean;
     batchInterval?: number;
     batchMaxSize?: number;
+    batchUrl?: string;
+    batchMode?: 'json' | 'form';
+    requestsFieldName?: string;
+    enableLoading?: boolean;
+    loadingOptions?: LoadingOptions;
     requestAdapter?: RequestAdapter;
     cacheAdapter?: CacheAdapter;
 }
@@ -113,11 +126,16 @@ export interface BatchItem {
     reject: (reason: any) => void;
 }
 export interface BatchConfig {
-    urls: string[];
+    batchUrl?: string;
+    responsePath?: string;
+    batchMode?: 'json' | 'form';
+    transformBatchRequest?: (requests: any[]) => any;
+    transformBatchResponse?: (batchResponse: Response, originalRequests: BatchItem[]) => any[];
     method?: Method;
     baseURL?: string;
     headers?: Record<string, string>;
     timeout?: number;
+    requestsFieldName?: string;
 }
 export interface NetworkStatus {
     isConnected: boolean;

@@ -18,3 +18,4 @@ export declare function normalizeHeaderName(headers: Record<string, string>, nor
 export declare function parseHeaders(headers: string): Record<string, string>;
 export declare function isJSONData(data: any): boolean;
 export declare function generateRandomId(): string;
+export declare function get(obj: any, path: string, defaultValue?: any): any;
