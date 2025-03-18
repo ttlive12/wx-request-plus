@@ -1,5 +1,5 @@
 import { RequestConfig, BatchItem, Response, BatchConfig } from './types';
-import { generateRandomId, delay } from './utils';
+import { generateRandomId, delay, deepMerge, get } from './utils';
 
 /**
  * 批处理管理器
@@ -9,6 +9,7 @@ export default class BatchManager {
   private maxBatchSize: number;
   private batchInterval: number;
   private batchTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
+  private defaultBatchConfig: Partial<BatchConfig>;
   
   /**
    * 构造函数
@@ -17,9 +18,22 @@ export default class BatchManager {
   constructor(options: {
     maxBatchSize?: number;
     batchInterval?: number;
+    batchUrl?: string;
+    batchMode?: 'json' | 'form';
+    requestsFieldName?: string;
   } = {}) {
     this.maxBatchSize = options.maxBatchSize || 5;
     this.batchInterval = options.batchInterval || 50;
+    this.defaultBatchConfig = {
+      batchUrl: options.batchUrl || '/batch',
+      batchMode: options.batchMode || 'json',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Batch-Request': 'true'
+      },
+      requestsFieldName: options.requestsFieldName || 'requests'
+    };
   }
   
   /**
@@ -116,10 +130,12 @@ export default class BatchManager {
     // 从第一个请求获取基本配置
     const firstConfig = items[0].config;
     const baseURL = firstConfig.baseURL;
-    const method = firstConfig.method || 'GET';
+    
+    // 获取批处理配置
+    const batchConfig = this.getBatchConfig(items);
     
     // 构建批量请求数据
-    const batchData = items.map(item => {
+    const requestData = items.map(item => {
       const { url, method, data, params, headers } = item.config;
       
       return {
@@ -131,25 +147,68 @@ export default class BatchManager {
       };
     });
     
+    // 应用自定义请求转换器
+    let finalData: any;
+    if (batchConfig.transformBatchRequest) {
+      finalData = batchConfig.transformBatchRequest(requestData);
+    } else if (batchConfig.batchMode === 'form') {
+      // FormData模式
+      const formData = new FormData();
+      requestData.forEach((req, index) => {
+        formData.append(`${index}_url`, req.url || '');
+        formData.append(`${index}_method`, req.method || 'GET');
+        if (req.data) {
+          formData.append(`${index}_data`, typeof req.data === 'object' ? JSON.stringify(req.data) : req.data);
+        }
+      });
+      finalData = formData;
+    } else {
+      // JSON模式（默认）
+      const fieldName = batchConfig.requestsFieldName || 'requests';
+      finalData = { [fieldName]: requestData };
+    }
+    
     // 构建批量请求配置
-    const batchConfig: RequestConfig = {
-      url: '/batch',  // 假设服务器有一个/batch端点
-      method: 'POST',
+    const requestConfig: RequestConfig = {
+      url: batchConfig.batchUrl || '/batch',
+      method: batchConfig.method || 'POST',
       baseURL,
-      data: batchData,
-      headers: {
+      data: finalData,
+      headers: batchConfig.headers || {
         'Content-Type': 'application/json',
         'X-Batch-Request': 'true'
-      }
+      },
+      timeout: batchConfig.timeout
     };
     
     // 发送批量请求
-    adapter(batchConfig)
+    adapter(requestConfig)
       .then(batchResponse => {
-        // 提取批量响应，假设服务器返回了一个数组响应
-        const responseArray = Array.isArray(batchResponse.data) 
-          ? batchResponse.data 
-          : [batchResponse.data];
+        // 使用自定义响应转换器
+        if (batchConfig.transformBatchResponse) {
+          const transformedResponses = batchConfig.transformBatchResponse(batchResponse, items);
+          items.forEach((item, index) => {
+            if (index < transformedResponses.length) {
+              item.resolve(transformedResponses[index]);
+            } else {
+              item.reject(new Error('批量响应不匹配'));
+            }
+          });
+          return;
+        }
+        
+        // 默认响应处理
+        let responseArray: any[] = [];
+        
+        // 如果有指定响应路径，尝试从该路径获取数据
+        if (batchConfig.responsePath) {
+          const pathData = get(batchResponse.data, batchConfig.responsePath);
+          responseArray = Array.isArray(pathData) ? pathData : [pathData];
+        } else {
+          responseArray = Array.isArray(batchResponse.data) 
+            ? batchResponse.data 
+            : [batchResponse.data];
+        }
         
         // 处理每个响应
         items.forEach((item, index) => {
@@ -158,7 +217,7 @@ export default class BatchManager {
             
             // 创建单个响应对象
             const response: Response = {
-              data: responseData.data,
+              data: responseData.data || responseData,
               status: responseData.status || batchResponse.status,
               statusText: responseData.statusText || batchResponse.statusText,
               headers: responseData.headers || {},
@@ -178,6 +237,23 @@ export default class BatchManager {
         // 所有批处理项都拒绝
         items.forEach(item => item.reject(error));
       });
+  }
+  
+  /**
+   * 获取批处理配置
+   * @param items 批处理项列表
+   * @returns 合并后的批处理配置
+   */
+  private getBatchConfig(items: BatchItem[]): BatchConfig {
+    // 从第一个请求提取批处理相关配置
+    const batchConfigs = items
+      .map(item => item.config.batchConfig || {})
+      .filter(config => Object.keys(config).length > 0);
+    
+    // 合并所有配置
+    return batchConfigs.length > 0
+      ? deepMerge(this.defaultBatchConfig, ...batchConfigs) as BatchConfig
+      : this.defaultBatchConfig as BatchConfig;
   }
   
   /**

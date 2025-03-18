@@ -1,10 +1,9 @@
 import {
   WxRequestConfig,
   RequestConfig,
-  Method,
   Response,
   RequestError,
-  ErrorType
+  LoadingOptions
 } from './types';
 import Interceptor from './interceptor';
 import LRUCacheAdapter from './adapters/cache';
@@ -12,12 +11,12 @@ import wxRequestAdapter from './adapters/wx-request';
 import RequestQueue from './queue';
 import BatchManager from './batch';
 import PreloadManager from './preload';
+import LoadingManager from './loading';
 import {
   deepMerge,
   buildURL,
   generateCacheKey,
   shouldCache,
-  createError,
   delay,
   isNetworkError,
   getNetworkStatus
@@ -41,6 +40,7 @@ export default class WxRequest {
   private requestQueue: RequestQueue;
   private batchManager: BatchManager;
   private preloadManager: PreloadManager;
+  private loadingManager: LoadingManager;
   
   /**
    * 构造函数
@@ -65,6 +65,15 @@ export default class WxRequest {
       enableOfflineQueue: true,
       batchInterval: 50,
       batchMaxSize: 5,
+      batchUrl: '/batch',
+      batchMode: 'json' as 'json' | 'form',
+      requestsFieldName: 'requests',
+      enableLoading: false, // 默认不启用全局loading
+      loadingOptions: {
+        title: '加载中...',
+        mask: false,
+        delay: 300
+      },
       ...config
     };
     
@@ -81,10 +90,15 @@ export default class WxRequest {
     
     this.batchManager = new BatchManager({
       maxBatchSize: this.defaults.batchMaxSize,
-      batchInterval: this.defaults.batchInterval
+      batchInterval: this.defaults.batchInterval,
+      batchUrl: this.defaults.batchUrl,
+      batchMode: this.defaults.batchMode,
+      requestsFieldName: this.defaults.requestsFieldName
     });
     
     this.preloadManager = new PreloadManager();
+    
+    this.loadingManager = new LoadingManager(this.defaults.loadingOptions);
     
     // 初始化拦截器
     this.interceptors = {
@@ -150,36 +164,77 @@ export default class WxRequest {
    * @param config 请求配置
    */
   private async sendRequest(config: RequestConfig): Promise<Response> {
-    // 检查是否有预加载响应
-    if (config.preloadKey && this.preloadManager.hasPreloadResponse(config.preloadKey)) {
-      const preloadedResponse = this.preloadManager.getPreloadResponse(config.preloadKey);
-      if (preloadedResponse) {
-        return preloadedResponse;
-      }
-    }
-    
-    // 检查缓存
-    if (shouldCache(config) && config.cacheAdapter) {
-      const cacheKey = generateCacheKey(config);
-      const cachedResponse = await config.cacheAdapter.get(cacheKey);
+    // 处理加载提示
+    let hideLoading: (() => void) | null = null;
+    try {
+      hideLoading = this.handleLoading(config);
       
-      if (cachedResponse) {
-        // 检查是否强制使用缓存
-        if (config.cache === 'only-if-cached') {
+      // 检查是否有预加载响应
+      if (config.preloadKey && this.preloadManager.hasPreloadResponse(config.preloadKey)) {
+        const preloadedResponse = this.preloadManager.getPreloadResponse(config.preloadKey);
+        if (preloadedResponse) {
+          return preloadedResponse;
+        }
+      }
+      
+      // 检查缓存
+      if (shouldCache(config) && config.cacheAdapter) {
+        const cacheKey = generateCacheKey(config);
+        const cachedResponse = await config.cacheAdapter.get(cacheKey);
+        
+        if (cachedResponse) {
+          // 检查是否强制使用缓存
+          if (config.cache === 'only-if-cached') {
+            return cachedResponse;
+          }
+          
+          // 在后台刷新缓存
+          if (config.cache !== 'force-cache') {
+            this.refreshCache(config, cacheKey);
+          }
+          
           return cachedResponse;
         }
-        
-        // 在后台刷新缓存
-        if (config.cache !== 'force-cache') {
-          this.refreshCache(config, cacheKey);
-        }
-        
-        return cachedResponse;
+      }
+      
+      // 没有缓存，发送实际请求
+      return this.performRequest(config);
+    } finally {
+      // 确保在所有情况下都隐藏加载提示
+      if (hideLoading) {
+        hideLoading();
       }
     }
+  }
+  
+  /**
+   * 处理加载提示的显示
+   * @param config 请求配置
+   * @returns 隐藏加载提示的函数
+   */
+  private handleLoading(config: RequestConfig): (() => void) | null {
+    // 确定是否显示加载提示
+    const shouldShowLoading = config.showLoading !== undefined 
+      ? config.showLoading 
+      : this.defaults.enableLoading;
     
-    // 没有缓存，发送实际请求
-    return this.performRequest(config);
+    if (!shouldShowLoading) {
+      return null;
+    }
+    
+    // 获取加载选项
+    let loadingOptions: LoadingOptions | undefined;
+    if (typeof config.showLoading === 'object') {
+      loadingOptions = config.showLoading;
+    } else {
+      loadingOptions = this.defaults.loadingOptions;
+    }
+    
+    // 使用请求的groupKey或URL作为loading分组键
+    const groupKey = config.groupKey || config.url || 'global';
+    
+    // 显示加载提示
+    return this.loadingManager.show(groupKey, loadingOptions);
   }
   
   /**
@@ -429,5 +484,16 @@ export default class WxRequest {
       queue: this.requestQueue.getStatus(),
       preload: this.preloadManager.getStatus()
     };
+  }
+  
+  /**
+   * 取消所有请求和加载提示
+   */
+  cancelAll(): void {
+    // 取消所有请求
+    this.cancelRequests(() => true);
+    
+    // 隐藏所有加载提示
+    this.loadingManager.hideAll();
   }
 } 

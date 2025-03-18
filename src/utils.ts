@@ -315,4 +315,27 @@ export function isJSONData(data: any): boolean {
  */
 export function generateRandomId(): string {
   return Math.random().toString(36).substring(2, 15);
+}
+
+/**
+ * 安全获取对象的嵌套属性
+ * @param obj 目标对象
+ * @param path 属性路径，例如'data.results'
+ * @param defaultValue 默认值，如果未找到属性则返回此值
+ * @returns 属性值或默认值
+ */
+export function get(obj: any, path: string, defaultValue: any = undefined): any {
+  if (!obj || !path) return defaultValue;
+  
+  const keys = path.split('.');
+  let result = obj;
+  
+  for (const key of keys) {
+    if (result === null || result === undefined || typeof result !== 'object') {
+      return defaultValue;
+    }
+    result = result[key];
+  }
+  
+  return result === undefined ? defaultValue : result;
 } 
