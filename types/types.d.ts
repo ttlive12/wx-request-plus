@@ -26,6 +26,8 @@ export interface RequestConfig {
     groupKey?: string;
     batchConfig?: Partial<BatchConfig>;
     showLoading?: boolean | LoadingOptions;
+    extractField?: string | ((data: any) => any);
+    skipExtract?: boolean;
     transformRequest?: (data: any, headers: Record<string, string>) => any;
     transformResponse?: (data: any, response: Response) => any;
     validateStatus?: (status: number) => boolean;
@@ -50,15 +52,12 @@ export interface WxRequestConfig extends RequestConfig {
     enableQueue?: boolean;
     maxConcurrent?: number;
     enableOfflineQueue?: boolean;
-    batchInterval?: number;
-    batchMaxSize?: number;
-    batchUrl?: string;
-    batchMode?: 'json' | 'form';
-    requestsFieldName?: string;
     enableLoading?: boolean;
     loadingOptions?: LoadingOptions;
+    extractField?: string | ((data: any) => any);
     requestAdapter?: RequestAdapter;
     cacheAdapter?: CacheAdapter;
+    batchConfig?: BatchConfig;
 }
 export interface Response<T = any> {
     data: T;
@@ -136,6 +135,8 @@ export interface BatchConfig {
     headers?: Record<string, string>;
     timeout?: number;
     requestsFieldName?: string;
+    batchInterval?: number;
+    batchMaxSize?: number;
 }
 export interface NetworkStatus {
     isConnected: boolean;
