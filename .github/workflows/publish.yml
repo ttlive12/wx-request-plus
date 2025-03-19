@@ -19,8 +19,14 @@ jobs:
           node-version: '16.x'
           registry-url: 'https://registry.npmjs.org'
       
+      - name: Configure npm
+        run: |
+          npm config set registry https://registry.npmjs.org/
+          npm config set strict-ssl false
+          npm config ls -l
+      
       - name: Install dependencies
-        run: npm install
+        run: npm install --no-fund --no-audit
       
       - name: Install gulp globally
         run: npm install -g gulp-cli
