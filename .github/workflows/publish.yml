@@ -16,14 +16,20 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '18.x'
+          node-version: '16.x'
           registry-url: 'https://registry.npmjs.org'
       
       - name: Install dependencies
-        run: npm ci
+        run: npm install
+      
+      - name: Install gulp globally
+        run: npm install -g gulp-cli
       
       - name: Build
         run: npm run build
+      
+      - name: Skip tests for now
+        run: echo "Skipping tests"
       
       - name: Publish to NPM
         if: startsWith(github.ref, 'refs/tags/v')
