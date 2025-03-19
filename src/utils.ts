@@ -338,4 +338,27 @@ export function get(obj: any, path: string, defaultValue: any = undefined): any 
   }
   
   return result === undefined ? defaultValue : result;
+}
+
+/**
+ * 根据路径从对象中提取值
+ * @param obj 目标对象
+ * @param path 属性路径，例如'data.results.0.id'
+ * @param defaultValue 默认值，如果未找到属性则返回此值
+ * @returns 属性值或默认值
+ */
+export function getValueByPath(obj: any, path: string, defaultValue: any = undefined): any {
+  if (!obj || !path) return defaultValue;
+  
+  const keys = path.split('.');
+  let result = obj;
+  
+  for (const key of keys) {
+    if (result === null || result === undefined || typeof result !== 'object') {
+      return defaultValue;
+    }
+    result = result[key];
+  }
+  
+  return result === undefined ? defaultValue : result;
 } 

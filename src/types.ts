@@ -46,6 +46,10 @@ export interface RequestConfig {
   // 加载提示相关
   showLoading?: boolean | LoadingOptions; // 是否显示加载提示或加载提示配置
   
+  // 响应处理相关
+  extractField?: string | ((data: any) => any); // 自动提取响应中的特定字段路径，如"data"或"data.list"，或自定义提取函数
+  skipExtract?: boolean;            // 是否跳过全局配置的字段提取
+  
   // 请求/响应处理
   transformRequest?: (data: any, headers: Record<string, string>) => any;   // 转换请求数据
   transformResponse?: (data: any, response: Response) => any;               // 转换响应数据
@@ -78,15 +82,12 @@ export interface WxRequestConfig extends RequestConfig {
   enableQueue?: boolean;            // 是否启用请求队列
   maxConcurrent?: number;           // 最大并发请求数
   enableOfflineQueue?: boolean;     // 无网络时是否进入离线队列
-  batchInterval?: number;           // 批处理请求间隔(ms)
-  batchMaxSize?: number;            // 批处理最大请求数
-  batchUrl?: string;                // 批处理请求URL，默认为"/batch"
-  batchMode?: 'json' | 'form';      // 批处理合并模式
-  requestsFieldName?: string;       // 批量请求的字段名
   enableLoading?: boolean;          // 全局是否启用加载提示
   loadingOptions?: LoadingOptions;  // 全局加载提示配置
+  extractField?: string | ((data: any) => any); // 自动提取响应中的特定字段路径，如"data"或"data.list"，或自定义提取函数
   requestAdapter?: RequestAdapter;  // 请求适配器
   cacheAdapter?: CacheAdapter;      // 缓存适配器
+  batchConfig?: BatchConfig;        // 批量请求配置
 }
 
 // 响应接口
@@ -176,7 +177,7 @@ export interface BatchItem {
 
 // 批处理配置
 export interface BatchConfig {
-  // 批处理请求URL，默认为"/batch"
+  // 批量请求URL，默认为"/batch"
   batchUrl?: string;
   // 响应数据路径，指定批量响应结果在返回数据中的路径，如"data.results"
   responsePath?: string;
@@ -196,6 +197,10 @@ export interface BatchConfig {
   timeout?: number;
   // 批量处理的请求字段名，默认为"requests"
   requestsFieldName?: string;
+  // 自动批处理的时间间隔(ms)
+  batchInterval?: number;
+  // 单个批处理的最大请求数
+  batchMaxSize?: number;
 }
 
 // 网络状态
