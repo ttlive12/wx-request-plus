@@ -32,19 +32,17 @@ npm install wx-request-plus --save
 2. 在 `app.js` 中引入：
 
 ```javascript
+// request.ts
 import WxRequest from 'wx-request-plus';
 
-// 创建实例并挂载到全局
 const wxRequest = WxRequest.create({
-  baseURL: 'https://api.example.com'
+  baseURL: ENV.PROD,
+  timeout: 4000,
+  batchUrl: '/batch',
+  enableLoading: true
 });
 
-// 挂载到全局对象以便在其他页面使用
-App({
-  globalData: {
-    wxRequest
-  }
-})
+export default wxRequest
 ```
 
 ## 基本使用
@@ -86,10 +84,11 @@ wxRequest.post('/users', {name: '张三', age: 25})
   });
 
 // 在页面组件中使用
+import wxRequest from './request';
+
 Page({
   onLoad() {
-    const app = getApp();
-    app.globalData.wxRequest.get('/products')
+    wxRequest.get('/products')
       .then(res => {
         this.setData({
           products: res.data
@@ -312,6 +311,10 @@ wxRequest.interceptors.request.use(
       ...config.headers,
       'Authorization': `Bearer ${wx.getStorageSync('token')}` 
     };
+    // 对GET请求默认启用缓存
+    if (config.method?.toUpperCase() === 'GET' && config.cache === undefined) {
+      config.cache = true;
+    }
     return config;
   },
   error => {
@@ -444,13 +447,6 @@ request('/api/users');
 const request = (url, config) => wxRequest.request(url, config);
 request('/api/users');
 ```
-
-### 类型兼容性问题
-
-如果遇到TypeScript类型错误，可以尝试：
-
-1. 使用构建脚本 `./build.sh`
-2. 或手动运行 `npm run build --skipLibCheck`
 
 ## 版本兼容性
 
