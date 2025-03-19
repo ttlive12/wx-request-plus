@@ -115,8 +115,7 @@ export interface CacheAdapter {
 }
 export interface QueueItem {
     config: RequestConfig;
-    resolve: (value: Response | PromiseLike<Response>) => void;
-    reject: (reason?: any) => void;
+    execute: () => Promise<void>;
     timestamp: number;
     priority: number;
     status: 'pending' | 'processing' | 'completed' | 'failed';

@@ -439,28 +439,44 @@ export default class WxRequest {
    * @param config 请求配置
    */
   private async performRequest(config: RequestConfig): Promise<Response> {
-    // 如果启用队列，加入请求队列
+
+    // 定义直接执行请求的函数
+    const directExecute = async (): Promise<Response> => {
+      console.log('📡 直接执行请求:', {
+        url: config.url,
+        method: config.method
+      });
+      
+      try {
+        // 直接发送请求
+        const response = await config.requestAdapter!(config);
+        
+        // 缓存响应
+        this.cacheResponse(config, response);
+        
+        return response;
+      } catch (error) {
+        // 处理错误和重试
+        return this.handleRequestError(error as RequestError, config);
+      }
+    };
+    
+    // 决定请求的执行方式（直接执行或加入队列）
+    let executeRequest: () => Promise<Response>;
+    
+    // 如果启用队列，让队列管理请求的执行时机，但执行逻辑仍使用directExecute
     if (this.defaults.enableQueue && !config.ignoreQueue) {
-      return this.requestQueue.enqueue(config);
+      executeRequest = () => this.requestQueue.enqueue(config, directExecute);
+    } else {
+      executeRequest = directExecute;
     }
     
-    // 如果开启了批处理并且有groupKey，加入批处理
+    // 如果开启了批处理并且有groupKey，交给批处理
     if (config.groupKey && this.defaults.batchInterval! > 0) {
       return this.batchManager.addToBatch(config, config.requestAdapter!);
     }
     
-    // 直接发送请求
-    try {
-      const response = await config.requestAdapter!(config);
-      
-      // 缓存响应
-      this.cacheResponse(config, response);
-      
-      return response;
-    } catch (error) {
-      // 处理错误和重试
-      return this.handleRequestError(error as RequestError, config);
-    }
+    return executeRequest();
   }
   
   /**

@@ -31,17 +31,29 @@ export default class RequestQueue {
   /**
    * 添加请求到队列
    * @param config 请求配置
+   * @param executor 请求执行函数，负责实际执行请求
    * @returns Promise
    */
-  enqueue(config: RequestConfig): Promise<Response> {
+  enqueue(config: RequestConfig, executor: () => Promise<Response>): Promise<Response> {
     return new Promise<Response>((resolve, reject) => {
       const priority = getPriority(config);
       
       // 创建队列项
       const queueItem: QueueItem = {
         config,
-        resolve,
-        reject,
+        execute: () => {
+          
+          // 使用传入的executor函数执行请求，并处理结果
+          return executor()
+            .then(response => {
+              resolve(response);
+              return Promise.resolve();
+            })
+            .catch(error => {
+              reject(error);
+              return Promise.resolve(); // 确保即使出错，Promise也会resolve，以便队列继续处理
+            });
+        },
         timestamp: Date.now(),
         priority,
         status: 'pending'
@@ -58,7 +70,7 @@ export default class RequestQueue {
         if (this.enableOfflineQueue) {
           this.offlineQueue.push(queueItem);
         } else {
-          queueItem.reject(createError(
+          reject(createError(
             '网络不可用',
             config,
             undefined,
@@ -87,14 +99,7 @@ export default class RequestQueue {
     // 取消待处理队列中的请求
     this.queue = this.queue.filter(item => {
       if (predicate(item.config)) {
-        item.reject(createError(
-          '请求已取消',
-          item.config,
-          undefined,
-          undefined,
-          undefined,
-          ErrorType.CANCEL
-        ));
+        // 不再需要调用reject，因为队列项现在没有reject函数
         return false;
       }
       return true;
@@ -103,14 +108,6 @@ export default class RequestQueue {
     // 取消离线队列中的请求
     this.offlineQueue = this.offlineQueue.filter(item => {
       if (predicate(item.config)) {
-        item.reject(createError(
-          '请求已取消',
-          item.config,
-          undefined,
-          undefined,
-          undefined,
-          ErrorType.CANCEL
-        ));
         return false;
       }
       return true;
@@ -123,18 +120,6 @@ export default class RequestQueue {
    * 清空队列
    */
   clear(): void {
-    // 拒绝所有待处理和离线队列中的请求
-    [...this.queue, ...this.offlineQueue].forEach(item => {
-      item.reject(createError(
-        '队列已清空',
-        item.config,
-        undefined,
-        undefined,
-        undefined,
-        ErrorType.CANCEL
-      ));
-    });
-    
     this.queue = [];
     this.offlineQueue = [];
   }
@@ -155,7 +140,9 @@ export default class RequestQueue {
    * 处理队列中的请求
    */
   private processQueue(): void {
-    if (this.isProcessing) return;
+    if (this.isProcessing) {
+      return;
+    }
     
     this.isProcessing = true;
     
@@ -204,31 +191,16 @@ export default class RequestQueue {
       this.processQueue();
     };
     
-    // 执行请求
-    if (item.config.requestAdapter) {
-      item.config.requestAdapter(item.config)
-        .then((response: Response) => {
-          item.status = 'completed';
-          item.resolve(response);
-        })
-        .catch((error: Error) => {
-          item.status = 'failed';
-          item.reject(error);
-        })
-        .finally(handleComplete);
-    } else {
-      // 没有适配器，直接失败
-      item.status = 'failed';
-      item.reject(createError(
-        '未提供请求适配器',
-        item.config,
-        undefined,
-        undefined,
-        undefined,
-        ErrorType.CLIENT
-      ));
-      handleComplete();
-    }
+    // 执行请求 - 使用队列项的execute方法
+    item.execute()
+      .then(() => {
+        item.status = 'completed';
+      })
+      .catch(error => {
+        item.status = 'failed';
+        console.error('队列项执行失败:', error);
+      })
+      .finally(handleComplete);
   }
   
   /**

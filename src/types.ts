@@ -163,8 +163,7 @@ export interface CacheAdapter {
 // 队列项接口
 export interface QueueItem {
   config: RequestConfig;
-  resolve: (value: Response | PromiseLike<Response>) => void;
-  reject: (reason?: any) => void;
+  execute: () => Promise<void>;    // 执行请求的函数
   timestamp: number;
   priority: number;
   status: 'pending' | 'processing' | 'completed' | 'failed';

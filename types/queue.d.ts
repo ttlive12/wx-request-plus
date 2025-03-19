@@ -11,7 +11,7 @@ export default class RequestQueue {
         maxConcurrent?: number;
         enableOfflineQueue?: boolean;
     });
-    enqueue(config: RequestConfig): Promise<Response>;
+    enqueue(config: RequestConfig, executor: () => Promise<Response>): Promise<Response>;
     cancel(predicate: (config: RequestConfig) => boolean): void;
     clear(): void;
     getStatus(): {
