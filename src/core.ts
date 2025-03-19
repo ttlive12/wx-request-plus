@@ -163,37 +163,45 @@ export default class WxRequest {
   /**
    * 发送请求
    * @param config 请求配置
-   * @returns Promise
+   * @returns Promise<Response<T>> 或 Promise<T>，取决于returnData配置
    */
-  request<T = any>(config: RequestConfig): Promise<Response<T>>;
+  request<T = any>(config: RequestConfig & { returnData?: true }): Promise<T>;
+  request<T = any>(config: RequestConfig & { returnData: false }): Promise<Response<T>>;
+  request<T = any>(config: RequestConfig): Promise<Response<T> | T>;
   /**
    * 发送请求
    * @param url 请求URL
    * @param config 请求配置（可选）
-   * @returns Promise
+   * @returns Promise<Response<T>> 或 Promise<T>，取决于returnData配置
    */
-  request<T = any>(url: string, config?: RequestConfig): Promise<Response<T>>;
+  request<T = any>(url: string, config?: RequestConfig & { returnData?: true }): Promise<T>;
+  request<T = any>(url: string, config?: RequestConfig & { returnData: false }): Promise<Response<T>>;
+  request<T = any>(url: string, config?: RequestConfig): Promise<Response<T> | T>;
   /**
    * 发送请求
    * @param url 请求URL
    * @param method 请求方法
    * @param config 请求配置（可选）
-   * @returns Promise
+   * @returns Promise<Response<T>> 或 Promise<T>，取决于returnData配置
    */
-  request<T = any>(url: string, method: Method, config?: RequestConfig): Promise<Response<T>>;
+  request<T = any>(url: string, method: Method, config?: RequestConfig & { returnData?: true }): Promise<T>;
+  request<T = any>(url: string, method: Method, config?: RequestConfig & { returnData: false }): Promise<Response<T>>;
+  request<T = any>(url: string, method: Method, config?: RequestConfig): Promise<Response<T> | T>;
   /**
    * 发送请求
    * @param url 请求URL
    * @param data 请求数据
    * @param config 请求配置（可选）
-   * @returns Promise
+   * @returns Promise<Response<T>> 或 Promise<T>，取决于returnData配置
    */
-  request<T = any>(url: string, data: any, config?: RequestConfig): Promise<Response<T>>;
+  request<T = any>(url: string, data: any, config?: RequestConfig & { returnData?: true }): Promise<T>;
+  request<T = any>(url: string, data: any, config?: RequestConfig & { returnData: false }): Promise<Response<T>>;
+  request<T = any>(url: string, data: any, config?: RequestConfig): Promise<Response<T> | T>;
   request<T = any>(
     urlOrConfig: string | RequestConfig,
     methodOrDataOrConfig?: Method | any | RequestConfig,
     configArg?: RequestConfig
-  ): Promise<Response<T>> {
+  ): Promise<Response<T> | T> {
     // 创建一个安全的this引用
     const self = this;
 
@@ -325,7 +333,23 @@ export default class WxRequest {
         };
       });
 
-      return promise as Promise<Response<T>>;
+      // 处理returnData选项，直接返回数据而非完整Response
+      promise = promise.then(response => {
+        // 获取returnData配置（优先使用请求配置，其次使用全局配置）
+        const shouldReturnData = config.returnData !== undefined 
+          ? config.returnData 
+          : self.defaults.returnData;
+        
+        // 如果配置了returnData为true，则只返回data部分
+        if (shouldReturnData) {
+          return response.data;
+        }
+        
+        // 否则返回完整response
+        return response;
+      });
+
+      return promise as any; // 使用any是因为返回类型可能是T或Response<T>
     } catch (error) {
       console.error('WxRequest.request调用失败:', error);
       return Promise.reject(error);
@@ -524,8 +548,11 @@ export default class WxRequest {
    * GET请求
    * @param url 请求URL
    * @param config 请求配置
+   * @returns Promise<Response<T>> 或 Promise<T>，取决于returnData配置
    */
-  get<T = any>(url: string, config: RequestConfig = {}): Promise<Response<T>> {
+  get<T = any>(url: string, config?: RequestConfig & { returnData?: true }): Promise<T>;
+  get<T = any>(url: string, config?: RequestConfig & { returnData: false }): Promise<Response<T>>;
+  get<T = any>(url: string, config: RequestConfig = {}): Promise<Response<T> | T> {
     if (!this || !this.defaults) {
       throw new Error('WxRequest实例的this上下文丢失。请使用wxRequest.get()的方式调用，或使用bind绑定上下文。');
     }
@@ -541,8 +568,11 @@ export default class WxRequest {
    * @param url 请求URL
    * @param data 请求数据
    * @param config 请求配置
+   * @returns Promise<Response<T>> 或 Promise<T>，取决于returnData配置
    */
-  post<T = any>(url: string, data?: any, config: RequestConfig = {}): Promise<Response<T>> {
+  post<T = any>(url: string, data?: any, config?: RequestConfig & { returnData?: true }): Promise<T>;
+  post<T = any>(url: string, data?: any, config?: RequestConfig & { returnData: false }): Promise<Response<T>>;
+  post<T = any>(url: string, data?: any, config: RequestConfig = {}): Promise<Response<T> | T> {
     if (!this || !this.defaults) {
       throw new Error('WxRequest实例的this上下文丢失。请使用wxRequest.post()的方式调用，或使用bind绑定上下文。');
     }
@@ -559,8 +589,11 @@ export default class WxRequest {
    * @param url 请求URL
    * @param data 请求数据
    * @param config 请求配置
+   * @returns Promise<Response<T>> 或 Promise<T>，取决于returnData配置
    */
-  put<T = any>(url: string, data?: any, config: RequestConfig = {}): Promise<Response<T>> {
+  put<T = any>(url: string, data?: any, config?: RequestConfig & { returnData?: true }): Promise<T>;
+  put<T = any>(url: string, data?: any, config?: RequestConfig & { returnData: false }): Promise<Response<T>>;
+  put<T = any>(url: string, data?: any, config: RequestConfig = {}): Promise<Response<T> | T> {
     if (!this || !this.defaults) {
       throw new Error('WxRequest实例的this上下文丢失。请使用wxRequest.put()的方式调用，或使用bind绑定上下文。');
     }
@@ -576,8 +609,11 @@ export default class WxRequest {
    * DELETE请求
    * @param url 请求URL
    * @param config 请求配置
+   * @returns Promise<Response<T>> 或 Promise<T>，取决于returnData配置
    */
-  delete<T = any>(url: string, config: RequestConfig = {}): Promise<Response<T>> {
+  delete<T = any>(url: string, config?: RequestConfig & { returnData?: true }): Promise<T>;
+  delete<T = any>(url: string, config?: RequestConfig & { returnData: false }): Promise<Response<T>>;
+  delete<T = any>(url: string, config: RequestConfig = {}): Promise<Response<T> | T> {
     if (!this || !this.defaults) {
       throw new Error('WxRequest实例的this上下文丢失。请使用wxRequest.delete()的方式调用，或使用bind绑定上下文。');
     }
@@ -592,8 +628,11 @@ export default class WxRequest {
    * HEAD请求
    * @param url 请求URL
    * @param config 请求配置
+   * @returns Promise<Response<T>> 或 Promise<T>，取决于returnData配置
    */
-  head<T = any>(url: string, config: RequestConfig = {}): Promise<Response<T>> {
+  head<T = any>(url: string, config?: RequestConfig & { returnData?: true }): Promise<T>;
+  head<T = any>(url: string, config?: RequestConfig & { returnData: false }): Promise<Response<T>>;
+  head<T = any>(url: string, config: RequestConfig = {}): Promise<Response<T> | T> {
     if (!this || !this.defaults) {
       throw new Error('WxRequest实例的this上下文丢失。请使用wxRequest.head()的方式调用，或使用bind绑定上下文。');
     }
@@ -608,8 +647,11 @@ export default class WxRequest {
    * OPTIONS请求
    * @param url 请求URL
    * @param config 请求配置
+   * @returns Promise<Response<T>> 或 Promise<T>，取决于returnData配置
    */
-  options<T = any>(url: string, config: RequestConfig = {}): Promise<Response<T>> {
+  options<T = any>(url: string, config?: RequestConfig & { returnData?: true }): Promise<T>;
+  options<T = any>(url: string, config?: RequestConfig & { returnData: false }): Promise<Response<T>>;
+  options<T = any>(url: string, config: RequestConfig = {}): Promise<Response<T> | T> {
     if (!this || !this.defaults) {
       throw new Error('WxRequest实例的this上下文丢失。请使用wxRequest.options()的方式调用，或使用bind绑定上下文。');
     }
@@ -624,15 +666,23 @@ export default class WxRequest {
    * 批量请求
    * @param requests 请求配置数组
    * @param config 批处理配置
+   * @returns 批量响应结果
    */
-  batch<T = any>(requests: RequestConfig[], config: RequestConfig = {}): Promise<Response<T>[]> {
+  batch<T = any>(requests: RequestConfig[], config?: RequestConfig & { returnData?: true }): Promise<T[]>;
+  batch<T = any>(requests: RequestConfig[], config?: RequestConfig & { returnData: false }): Promise<Response<T>[]>;
+  batch<T = any>(requests: RequestConfig[], config: RequestConfig = {}): Promise<(Response<T> | T)[]> {
     if (!this || !this.batchManager) {
       throw new Error('WxRequest实例的this上下文丢失。请使用wxRequest.batch()的方式调用，或使用bind绑定上下文。');
     }
     return this.batchManager.executeBatch(
       requests.map(req => deepMerge(config, req)),
       this.sendRequest.bind(this)
-    );
+    ).then(responses => {
+      if (config.returnData !== undefined ? config.returnData : this.defaults.returnData) {
+        return responses.map(response => response.data);
+      }
+      return responses;
+    });
   }
   
   /**

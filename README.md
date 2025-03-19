@@ -16,7 +16,7 @@
 - 🔍 **自动提取响应字段** - 简化数据获取，直达核心内容
 - 🔄 **智能重试机制** - 网络错误自动重试，指数退避策略
 - ❌ **请求取消支持** - 取消不需要的请求，优化资源利用
-- 🔧 **高度可定制化** - 适应各种复杂场景的灵活配置
+- 🔧 **高度可定制化** - 更多适应各种复杂场景的灵活配置
 
 ## 安装
 
@@ -400,6 +400,7 @@ wxRequest.cancelAll();
 | enableLoading | boolean | 全局是否启用加载提示 | false |
 | loadingOptions | object | 全局加载提示配置 | {title:'加载中...',mask:false,delay:300} |
 | extractField | string/function | 自动提取响应字段 | undefined |
+| returnData | boolean | 是否直接返回数据而非Response对象 | false |
 | batchConfig | object | 批量请求配置 | {batchUrl:'/batch',batchMode:'json',...} |
 
 ### 批量请求配置选项

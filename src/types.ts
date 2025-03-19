@@ -49,6 +49,7 @@ export interface RequestConfig {
   // 响应处理相关
   extractField?: string | ((data: any) => any); // 自动提取响应中的特定字段路径，如"data"或"data.list"，或自定义提取函数
   skipExtract?: boolean;            // 是否跳过全局配置的字段提取
+  returnData?: boolean;             // 是否直接返回响应数据而非完整Response对象
   
   // 请求/响应处理
   transformRequest?: (data: any, headers: Record<string, string>) => any;   // 转换请求数据
@@ -85,6 +86,7 @@ export interface WxRequestConfig extends RequestConfig {
   enableLoading?: boolean;          // 全局是否启用加载提示
   loadingOptions?: LoadingOptions;  // 全局加载提示配置
   extractField?: string | ((data: any) => any); // 自动提取响应中的特定字段路径，如"data"或"data.list"，或自定义提取函数
+  returnData?: boolean;             // 是否直接返回响应数据而非完整Response对象
   requestAdapter?: RequestAdapter;  // 请求适配器
   cacheAdapter?: CacheAdapter;      // 缓存适配器
   batchConfig?: BatchConfig;        // 批量请求配置
