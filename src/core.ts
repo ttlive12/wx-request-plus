@@ -20,7 +20,8 @@ import {
   shouldCache,
   delay,
   isNetworkError,
-  getNetworkStatus
+  getNetworkStatus,
+  getValueByPath
 } from './utils';
 
 /**
@@ -74,19 +75,30 @@ export default class WxRequest {
       enableQueue: true,
       maxConcurrent: 10,
       enableOfflineQueue: true,
-      batchInterval: 50,
-      batchMaxSize: 5,
-      batchUrl: '/batch',
-      batchMode: 'json' as 'json' | 'form',
-      requestsFieldName: 'requests',
       enableLoading: false, // 默认不启用全局loading
       loadingOptions: {
         title: '加载中...',
         mask: false,
         delay: 300
       },
+      // 默认的批量请求配置
+      batchConfig: {
+        batchUrl: '/batch',
+        batchMode: 'json',
+        requestsFieldName: 'requests',
+        batchInterval: 50,
+        batchMaxSize: 5
+      },
       ...config
     };
+    
+    // 合并批量请求配置
+    if (config.batchConfig) {
+      this.defaults.batchConfig = {
+        ...this.defaults.batchConfig,
+        ...config.batchConfig
+      };
+    }
     
     // 初始化组件
     this.cacheAdapter = new LRUCacheAdapter({
@@ -99,12 +111,21 @@ export default class WxRequest {
       enableOfflineQueue: this.defaults.enableOfflineQueue
     });
     
+    // 确保batchConfig存在
+    const batchConfig = this.defaults.batchConfig || {
+      batchUrl: '/batch',
+      batchMode: 'json',
+      requestsFieldName: 'requests',
+      batchInterval: 50,
+      batchMaxSize: 5
+    };
+    
     this.batchManager = new BatchManager({
-      maxBatchSize: this.defaults.batchMaxSize,
-      batchInterval: this.defaults.batchInterval,
-      batchUrl: this.defaults.batchUrl,
-      batchMode: this.defaults.batchMode,
-      requestsFieldName: this.defaults.requestsFieldName
+      maxBatchSize: batchConfig.batchMaxSize,
+      batchInterval: batchConfig.batchInterval,
+      batchUrl: batchConfig.batchUrl,
+      batchMode: batchConfig.batchMode,
+      requestsFieldName: batchConfig.requestsFieldName
     });
     
     this.preloadManager = new PreloadManager();
@@ -267,6 +288,43 @@ export default class WxRequest {
         promise = promise.then(chain.shift(), chain.shift());
       }
       
+      // 处理自动提取字段
+      promise = promise.then(response => {
+        // 如果配置了skipExtract，则跳过提取
+        if (config.skipExtract) {
+          return response;
+        }
+
+        // 获取提取配置（优先使用请求配置，其次使用全局配置）
+        const extractField = config.extractField || self.defaults.extractField;
+        
+        if (!extractField) {
+          return response;
+        }
+
+        // 如果extractField是函数，直接使用它处理数据
+        if (typeof extractField === 'function') {
+          return {
+            ...response,
+            data: extractField(response.data)
+          };
+        }
+
+        // 如果extractField是字符串，使用路径提取
+        const extractedData = getValueByPath(response.data, extractField);
+        
+        // 如果提取失败，返回原始数据
+        if (extractedData === undefined) {
+          console.warn(`无法从响应中提取字段: ${extractField}`);
+          return response;
+        }
+
+        return {
+          ...response,
+          data: extractedData
+        };
+      });
+
       return promise as Promise<Response<T>>;
     } catch (error) {
       console.error('WxRequest.request调用失败:', error);
