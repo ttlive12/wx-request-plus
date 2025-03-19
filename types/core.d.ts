@@ -11,6 +11,7 @@ export default class WxRequest {
     private batchManager;
     private preloadManager;
     private loadingManager;
+    static create(config?: WxRequestConfig): WxRequest;
     constructor(config?: WxRequestConfig);
     request<T = any>(config: RequestConfig): Promise<Response<T>>;
     request<T = any>(url: string, config?: RequestConfig): Promise<Response<T>>;
