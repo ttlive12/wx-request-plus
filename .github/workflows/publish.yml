@@ -51,14 +51,20 @@ jobs:
       
       - name: Setup npm auth
         run: |
-          echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > ~/.npmrc
-          npm whoami
+          # 创建.npmrc文件
+          echo "registry=https://registry.npmjs.org/" > .npmrc
+          echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" >> .npmrc
+          echo "always-auth=true" >> .npmrc
+          
+          # 验证npm配置
+          cat .npmrc
+          npm config ls -l
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       
       - name: Publish to NPM
         if: startsWith(github.ref, 'refs/tags/v')
-        run: npm publish --access public --registry=https://registry.npmjs.org/
+        run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       
