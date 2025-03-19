@@ -1,20 +1,22 @@
 # wx-request-plus
 
-一个功能强大的微信小程序请求库，对wx.request进行了全面增强。
+一个功能强大的微信小程序请求库，对wx.request进行了全面增强，提供更优雅的API和丰富的功能。
 
-## 特性
+## ✨ 主要特性
 
-- ✅ 完整的TypeScript支持和类型提示
-- ✅ Promise风格API
-- ✅ LRU缓存机制
-- ✅ 无网/弱网支持
-- ✅ 请求队列管理
-- ✅ 请求合并与批处理
-- ✅ 预请求支持
-- ✅ 完善的错误处理
-- ✅ 请求与响应拦截器
-- ✅ 自动加载提示
-- ✅ 高度可定制化
+- 🚀 **完整的TypeScript支持** - 类型安全的API调用，智能提示
+- ⛓️ **Promise风格API** - 告别回调地狱，优雅处理异步
+- 💾 **智能缓存机制** - LRU缓存策略，优化请求性能
+- 📶 **弱网环境支持** - 离线队列，自动重试，网络恢复自动发送
+- 🚦 **请求队列管理** - 控制并发，设置优先级，避免请求风暴
+- 📦 **请求合并与批处理** - 合并多个请求为一个HTTP请求，减少网络开销
+- 🔮 **预请求支持** - 提前加载数据，瞬时响应用户操作
+- 🛡️ **拦截器机制** - 全局处理请求和响应，统一错误处理
+- ⏳ **智能加载提示** - 自动管理loading状态，支持分组和自定义
+- 🔍 **自动提取响应字段** - 简化数据获取，直达核心内容
+- 🔄 **智能重试机制** - 网络错误自动重试，指数退避策略
+- ❌ **请求取消支持** - 取消不需要的请求，优化资源利用
+- 🔧 **高度可定制化** - 适应各种复杂场景的灵活配置
 
 ## 安装
 
@@ -28,19 +30,34 @@ npm install wx-request-plus --save
 
 1. 在微信开发者工具中，点击【工具】->【构建npm】
 2. 在 `app.js` 中引入：
-   ```javascript
-   import WxRequest from 'wx-request-plus';
-   ```
 
-## 基本用法
+```javascript
+import WxRequest from 'wx-request-plus';
+
+// 创建实例并挂载到全局
+const wxRequest = WxRequest.create({
+  baseURL: 'https://api.example.com'
+});
+
+// 挂载到全局对象以便在其他页面使用
+App({
+  globalData: {
+    wxRequest
+  }
+})
+```
+
+## 基本使用
+
+### 创建请求实例
 
 ```typescript
 import WxRequest from 'wx-request-plus';
 
-// 创建请求实例 (推荐方式)
+// 推荐方式: 使用静态工厂方法创建实例
 const wxRequest = WxRequest.create({
   baseURL: 'https://api.example.com',
-  timeout: 10000,
+  timeout: 5000,
   headers: {
     'Content-Type': 'application/json'
   }
@@ -48,8 +65,12 @@ const wxRequest = WxRequest.create({
 
 // 也可以使用构造函数方式
 // const wxRequest = new WxRequest({...});
+```
 
-// 使用Promise方式发起请求
+### 发起请求
+
+```typescript
+// 发起GET请求
 wxRequest.get('/users')
   .then(res => {
     console.log('用户数据:', res.data);
@@ -58,110 +79,198 @@ wxRequest.get('/users')
     console.error('请求失败:', err);
   });
 
-// 使用缓存
-wxRequest.get('/config', { cache: true, cacheExpire: 60000 })
+// 发起POST请求
+wxRequest.post('/users', {name: '张三', age: 25})
   .then(res => {
-    console.log('配置数据(可能来自缓存):', res.data);
+    console.log('创建成功:', res.data);
   });
+
+// 在页面组件中使用
+Page({
+  onLoad() {
+    const app = getApp();
+    app.globalData.wxRequest.get('/products')
+      .then(res => {
+        this.setData({
+          products: res.data
+        });
+      });
+  }
+})
 ```
 
-## 多种请求方式
+## 功能特性
 
-wx-request-plus支持多种灵活的请求方式：
+### 支持多种请求方式
 
 ```typescript
-// 方式1: 使用HTTP方法特定的便捷函数
+// 便捷方法
 wxRequest.get('/users');
 wxRequest.post('/users', { name: '张三' });
 wxRequest.put('/users/1', { name: '李四' });
 wxRequest.delete('/users/1');
+wxRequest.head('/users');
+wxRequest.options('/users');
 
-// 方式2: 使用通用request方法(完整配置对象)
+// 通用request方法
 wxRequest.request({
   url: '/users',
   method: 'GET',
   params: { role: 'admin' }
 });
 
-// 方式3: 只提供URL (默认GET请求)
-wxRequest.request('/users');
-
-// 方式4: 提供URL和请求方法
-wxRequest.request('/users', 'POST');
-
-// 方式5: 提供URL和数据 (默认POST请求)
-wxRequest.request('/users', { name: '张三' });
-
-// 方式6: 提供URL和配置
-wxRequest.request('/users', { params: { role: 'admin' } });
-
-// 方式7: 提供URL、请求方法和配置
-wxRequest.request('/users', 'GET', { params: { role: 'admin' } });
-
-// 方式8: 提供URL、数据和配置
-wxRequest.request('/users', { name: '张三' }, { timeout: 5000 });
+// 灵活参数
+wxRequest.request('/users');  // GET请求
+wxRequest.request('/users', 'POST');  // POST请求
+wxRequest.request('/users', { name: '张三' });  // POST请求带数据
 ```
 
-## 加载提示
+### 自动提取响应字段
 
-wx-request-plus 支持在请求过程中自动显示和隐藏加载提示，无需手动管理 wx.showLoading 和 wx.hideLoading。
-
-### 基本用法
+自动提取标准API响应中的特定字段，简化数据处理流程。
 
 ```typescript
-// 全局启用加载提示
-const wxRequest = new WxRequest({
+// 全局配置自动提取data字段
+const wxRequest = WxRequest.create({
   baseURL: 'https://api.example.com',
-  enableLoading: true,  // 启用全局加载提示
+  extractField: 'data' // 自动提取response.data
+});
+
+// 单次请求配置
+wxRequest.get('/users', {
+  extractField: 'data.list'  // 提取嵌套字段
+});
+
+wxRequest.get('/raw', {
+  skipExtract: true  // 跳过提取，获取原始响应
+});
+
+// 使用自定义提取函数
+wxRequest.get('/custom', {
+  extractField: (data) => data.result.items.filter(item => item.active)
+});
+```
+
+### 强大的缓存机制
+
+支持多种缓存策略，在弱网环境下提供更好的用户体验。
+
+```typescript
+// 使用缓存
+wxRequest.get('/config', { 
+  cache: true,              // 启用缓存
+  cacheExpire: 60000        // 缓存60秒
+});
+
+// 缓存模式
+wxRequest.get('/users', { 
+  cache: 'force-cache'      // 强制使用缓存，优先从缓存读取
+});
+
+wxRequest.get('/profile', { 
+  cache: 'only-if-cached'   // 只使用缓存，没有缓存则报错
+});
+
+// 清除缓存
+wxRequest.clearCache();
+```
+
+### 请求队列和并发控制
+
+智能管理请求队列，控制并发数量，确保重要请求优先处理。
+
+```typescript
+// 全局配置
+const wxRequest = WxRequest.create({
+  enableQueue: true,        // 启用请求队列
+  maxConcurrent: 5,         // 最大并发请求数
+  enableOfflineQueue: true  // 离线时自动加入队列
+});
+
+// 设置请求优先级
+wxRequest.get('/important', { 
+  priority: 10  // 高优先级(1-10)，数字越大优先级越高
+});
+
+// 忽略队列限制
+wxRequest.get('/bypass-queue', { 
+  ignoreQueue: true  // 该请求不进入队列
+});
+```
+
+### 批量请求处理
+
+支持将多个请求合并为一个HTTP请求发送，减少网络开销。
+
+```typescript
+// 自动批处理
+wxRequest.get('/users/1', { groupKey: 'userGroup' });
+wxRequest.get('/users/2', { groupKey: 'userGroup' });
+wxRequest.get('/users/3', { groupKey: 'userGroup' });
+// 相同groupKey的请求会自动合并发送
+
+// 手动批量请求
+wxRequest.batch([
+  { url: '/users/1', method: 'GET' },
+  { url: '/products/2', method: 'GET' },
+  { url: '/orders', method: 'POST', data: { productId: 2 } }
+])
+.then(([userRes, productRes, orderRes]) => {
+  console.log(userRes.data, productRes.data, orderRes.data);
+});
+
+// 批量请求配置
+const wxRequest = WxRequest.create({
+  batchConfig: {
+    batchUrl: '/batch',             // 批量请求的URL
+    batchMode: 'json',              // 合并模式: json或form
+    requestsFieldName: 'requests',  // 请求数组字段名
+    batchInterval: 50,              // 自动批处理间隔(ms)
+    batchMaxSize: 5                 // 单批次最大请求数
+  }
+});
+```
+
+### 智能加载提示
+
+自动管理加载提示的显示和隐藏，支持分组和自定义加载效果。
+
+```typescript
+// 全局配置
+const wxRequest = WxRequest.create({
+  enableLoading: true,      // 全局启用加载提示
   loadingOptions: {
-    title: '加载中...',  // 自定义提示文字
-    mask: true,         // 显示蒙层
-    delay: 300          // 延迟显示，避免请求过快时闪烁
+    title: '加载中...',     // 提示文字
+    mask: true,             // 显示遮罩
+    delay: 300              // 延迟显示时间(ms)
   }
 });
 
-// 为单个请求配置加载提示
+// 单次请求配置
 wxRequest.get('/users', {
-  showLoading: true  // 只显示加载提示，使用全局配置
+  showLoading: true  // 使用全局配置
 });
 
-// 自定义单个请求的加载提示
+// 自定义加载提示
 wxRequest.post('/orders', data, {
   showLoading: {
     title: '提交订单中...',
-    mask: true,
-    delay: 0  // 立即显示
+    mask: true
   }
 });
 
-// 禁用特定请求的加载提示
-wxRequest.get('/config', {
-  showLoading: false
-});
-```
-
-### 分组加载提示
-
-```typescript
-// 同一分组的请求共享一个loading，最后一个请求完成时才会隐藏
+// 分组加载提示
 wxRequest.get('/users', { groupKey: 'userInfo', showLoading: true });
 wxRequest.get('/orders', { groupKey: 'userInfo', showLoading: true });
-// 只会显示一个loading，两个请求都完成后才会隐藏
-```
+// 相同分组共享一个loading，全部完成后才会隐藏
 
-### 自定义加载提示
-
-```typescript
-// 使用自定义加载组件
-const wxRequest = new WxRequest({
-  enableLoading: true,
+// 自定义加载组件
+const wxRequest = WxRequest.create({
   loadingOptions: {
     customLoader: (show, options) => {
       if (show) {
-        // 使用自定义组件显示加载
-        this.setData({ loading: true, loadingText: options?.title || '加载中' });
+        this.setData({ loading: true, loadingText: options?.title });
       } else {
-        // 隐藏自定义加载
         this.setData({ loading: false });
       }
     }
@@ -169,230 +278,43 @@ const wxRequest = new WxRequest({
 });
 ```
 
-## 批量请求
+### 预请求支持
 
-批量请求功能支持将多个请求合并为一个HTTP请求发送，以减少网络开销和提高性能。
-
-### 基本用法
+提前加载数据，在用户实际需要时立即提供，提升用户体验。
 
 ```typescript
-// 使用auto模式（自动批处理）
-wxRequest.get('/users/1', { groupKey: 'userGroup' });
-wxRequest.get('/users/2', { groupKey: 'userGroup' });
-wxRequest.get('/users/3', { groupKey: 'userGroup' });
+// 预加载数据
+wxRequest.preRequest({
+  url: '/products',
+  preloadKey: 'hotProducts',  // 预加载键
+  expireTime: 60000           // 预加载数据有效期
+});
 
-// 这些请求会被自动合并成一个批量请求
-
-// 或者使用手动模式
-wxRequest.batch([
-  { url: '/users/1', method: 'GET' },
-  { url: '/users/2', method: 'GET' },
-  { url: '/categories', method: 'GET' }
-])
-.then(([user1Res, user2Res, categoriesRes]) => {
-  console.log(user1Res.data, user2Res.data, categoriesRes.data);
+// 实际使用时直接获取预加载的数据
+wxRequest.get('/products', { 
+  preloadKey: 'hotProducts'  // 使用预加载的数据
+})
+.then(res => {
+  console.log('立即获取预加载数据:', res.data);
 });
 ```
 
-### 高级配置
+### 请求和响应拦截器
 
-```typescript
-// 全局配置
-const wxRequest = new WxRequest({
-  // 批量请求相关配置
-  batchUrl: '/api/batch',         // 批量请求端点
-  batchMode: 'json',              // 批量请求模式：'json'或'form'
-  batchInterval: 50,              // 自动批处理的时间间隔(ms)
-  batchMaxSize: 10,               // 单个批处理的最大请求数
-  requestsFieldName: 'requests'   // 请求字段名称
-});
-
-// 单个请求的批处理配置
-wxRequest.get('/users/1', {
-  groupKey: 'userGroup',
-  batchConfig: {
-    batchUrl: '/api/v2/batch',    // 覆盖默认批处理URL
-    responsePath: 'data.results', // 从响应数据的特定路径获取结果
-    batchMode: 'form',            // 使用formData方式发送批量请求
-    transformBatchRequest: (requests) => {
-      // 自定义请求数据格式
-      return { batch: requests, timestamp: Date.now() };
-    },
-    transformBatchResponse: (batchResponse, originalRequests) => {
-      // 自定义响应数据处理
-      const results = batchResponse.data.results;
-      return originalRequests.map((req, index) => {
-        return {
-          data: results[index],
-          status: 200,
-          statusText: 'OK',
-          headers: batchResponse.headers,
-          config: req.config,
-          request: batchResponse.request,
-          timestamp: Date.now()
-        };
-      });
-    }
-  }
-});
-```
-
-### 服务端接口规范
-
-#### 默认格式（JSON模式）
-
-请求格式：
-```json
-POST /batch
-Content-Type: application/json
-X-Batch-Request: true
-
-{
-  "requests": [
-    {
-      "url": "/users/1",
-      "method": "GET",
-      "headers": { "Authorization": "Bearer xxx" }
-    },
-    {
-      "url": "/products/2",
-      "method": "GET",
-      "params": { "fields": "name,price" }
-    },
-    {
-      "url": "/orders",
-      "method": "POST",
-      "data": { "productId": 123, "quantity": 1 }
-    }
-  ]
-}
-```
-
-响应格式：
-```json
-200 OK
-Content-Type: application/json
-
-[
-  {
-    "data": { "id": 1, "name": "User 1" },
-    "status": 200
-  },
-  {
-    "data": { "id": 2, "name": "Product 2", "price": 99.99 },
-    "status": 200
-  },
-  {
-    "data": { "orderId": 456, "status": "created" },
-    "status": 201
-  }
-]
-```
-
-#### 表单模式
-
-请求格式：
-```
-POST /batch
-Content-Type: multipart/form-data
-
-0_url=/users/1
-0_method=GET
-1_url=/products/2
-1_method=GET
-1_params=fields=name,price
-2_url=/orders
-2_method=POST
-2_data={"productId":123,"quantity":1}
-```
-
-#### 自定义响应格式
-
-你可以使用`responsePath`或`transformBatchResponse`来处理非标准响应格式：
-
-```json
-{
-  "code": 0,
-  "message": "Success",
-  "data": {
-    "results": [
-      { "id": 1, "name": "User 1" },
-      { "id": 2, "name": "Product 2", "price": 99.99 },
-      { "orderId": 456, "status": "created" }
-    ],
-    "timestamp": 1620000000000
-  }
-}
-```
-
-使用`responsePath: "data.results"`即可正确获取结果数组。
-
-## API文档
-
-### 创建实例
-
-```typescript
-const wxRequest = new WxRequest(config);
-```
-
-#### 配置选项
-
-| 参数 | 类型 | 描述 | 默认值 |
-| --- | --- | --- | --- |
-| baseURL | string | 请求的基础URL | - |
-| timeout | number | 超时时间(ms) | 30000 |
-| headers | object | 默认请求头 | {} |
-| maxCacheSize | number | 最大缓存条目数 | 100 |
-| maxCacheAge | number | 默认缓存过期时间(ms) | 5分钟 |
-| retryTimes | number | 网络错误重试次数 | 3 |
-| retryDelay | number | 重试间隔(ms) | 1000 |
-| enableQueue | boolean | 是否启用请求队列 | true |
-| maxConcurrent | number | 最大并发请求数 | 10 |
-| enableOfflineQueue | boolean | 无网络时是否进入离线队列 | true |
-| batchUrl | string | 批量请求URL | /batch |
-| batchMode | 'json'\|'form' | 批量请求模式 | json |
-| batchMaxSize | number | 单批次最大请求数 | 5 |
-| batchInterval | number | 自动批处理间隔(ms) | 50 |
-| requestsFieldName | string | 批量请求字段名 | requests |
-| enableLoading | boolean | 是否全局启用加载提示 | false |
-| loadingOptions | object | 全局加载提示配置 | {title:'加载中...',mask:false,delay:300} |
-
-#### 加载提示配置
-
-| 参数 | 类型 | 描述 | 默认值 |
-| --- | --- | --- | --- |
-| title | string | 加载提示文字 | 加载中... |
-| mask | boolean | 是否显示透明蒙层 | false |
-| delay | number | 延迟显示时间(ms) | 300 |
-| customLoader | function | 自定义加载提示实现 | - |
-
-### 请求方法
-
-- `get(url, config)`
-- `post(url, data, config)`
-- `put(url, data, config)`
-- `delete(url, config)`
-- `head(url, config)`
-- `options(url, config)`
-- `request(config)`
-- `batch(requests, config)`
-- `preRequest(requests)`
-
-### 拦截器
+拦截请求和响应，进行全局处理，如添加认证信息、统一错误处理等。
 
 ```typescript
 // 请求拦截器
 wxRequest.interceptors.request.use(
   config => {
-    // 在发送请求前做些什么
+    // 添加token
     config.headers = { 
-      ...config.headers, 
-      'Authorization': `Bearer ${getToken()}` 
+      ...config.headers,
+      'Authorization': `Bearer ${wx.getStorageSync('token')}` 
     };
     return config;
   },
   error => {
-    // 对请求错误做些什么
     return Promise.reject(error);
   }
 );
@@ -400,62 +322,117 @@ wxRequest.interceptors.request.use(
 // 响应拦截器
 wxRequest.interceptors.response.use(
   response => {
-    // 对响应数据做些什么
+    // 统一处理业务逻辑错误
     if (response.data.code !== 0) {
+      wx.showToast({ title: response.data.message, icon: 'none' });
       return Promise.reject(response.data);
     }
     return response;
   },
   error => {
-    // 对响应错误做些什么
+    // 统一处理HTTP错误
     if (error.status === 401) {
-      // 处理未授权错误
+      // 处理登录过期
+      wx.navigateTo({ url: '/pages/login/index' });
+    } else {
+      wx.showToast({ title: '网络错误，请稍后重试', icon: 'none' });
     }
     return Promise.reject(error);
   }
 );
 ```
 
+### 错误重试和网络状态管理
+
+智能处理网络错误，支持自动重试和网络状态监控。
+
+```typescript
+// 全局配置重试
+const wxRequest = WxRequest.create({
+  retryTimes: 3,     // 最大重试次数
+  retryDelay: 1000   // 重试间隔(ms)
+});
+
+// 单次请求配置
+wxRequest.get('/important-api', {
+  retry: 5,  // 指定重试次数
+  retryDelay: 2000,  // 重试间隔
+  retryIncrementalDelay: true  // 递增延迟
+});
+
+// 获取网络状态
+wxRequest.getNetworkStatus().then(status => {
+  console.log('当前网络状态:', status.isConnected, status.networkType);
+});
+```
+
+### 请求取消
+
+支持取消正在进行的请求，避免不必要的网络开销。
+
+```typescript
+// 取消特定请求
+wxRequest.cancelRequests(config => config.url.includes('/users'));
+
+// 取消所有请求和加载提示
+wxRequest.cancelAll();
+```
+
+## API文档
+
+### 配置选项
+
+| 参数 | 类型 | 描述 | 默认值 |
+| --- | --- | --- | --- |
+| baseURL | string | 请求的基础URL | '' |
+| timeout | number | 超时时间(ms) | 30000 |
+| headers | object | 默认请求头 | {'Content-Type': 'application/json'} |
+| maxCacheSize | number | 最大缓存条目数 | 100 |
+| maxCacheAge | number | 默认缓存过期时间(ms) | 5分钟 |
+| retryTimes | number | 全局默认重试次数 | 3 |
+| retryDelay | number | 全局默认重试延迟 | 1000 |
+| enableQueue | boolean | 是否启用请求队列 | true |
+| maxConcurrent | number | 最大并发请求数 | 10 |
+| enableOfflineQueue | boolean | 无网络时是否进入离线队列 | true |
+| enableLoading | boolean | 全局是否启用加载提示 | false |
+| loadingOptions | object | 全局加载提示配置 | {title:'加载中...',mask:false,delay:300} |
+| extractField | string/function | 自动提取响应字段 | undefined |
+| batchConfig | object | 批量请求配置 | {batchUrl:'/batch',batchMode:'json',...} |
+
+### 批量请求配置选项
+
+| 参数 | 类型 | 描述 | 默认值 |
+| --- | --- | --- | --- |
+| batchUrl | string | 批量请求的URL | /batch |
+| batchMode | 'json'\|'form' | 请求合并模式 | json |
+| requestsFieldName | string | 请求数组在请求体中的字段名 | requests |
+| batchInterval | number | 自动批处理的时间间隔(ms) | 50 |
+| batchMaxSize | number | 单个批处理的最大请求数 | 5 |
+| responsePath | string | 响应数据的提取路径 | - |
+| transformBatchRequest | function | 自定义请求数据转换函数 | - |
+| transformBatchResponse | function | 自定义响应数据转换函数 | - |
+
 ## 常见问题
-
-### 类型兼容性问题
-
-由于微信小程序版本和TypeScript版本不同，可能会遇到类型兼容性问题。如果遇到类型错误，可以尝试：
-
-1. 使用我们提供的构建脚本 `./build.sh`
-2. 或手动运行 `npm run build`，它使用了 `--skipLibCheck` 选项跳过类型检查
 
 ### this上下文丢失问题
 
-如果您遇到以下错误：
-```
-TypeError: Cannot read property 'defaults' of undefined
-```
-
-这通常是因为调用方法时丢失了this上下文。这是JavaScript中的常见问题，尤其当方法被单独传递或解构时。
+如果遇到以下错误：`TypeError: Cannot read property 'defaults' of undefined`，通常是因为调用方法时丢失了this上下文。
 
 #### 错误用法
 
 ```javascript
-// ❌ 错误用法1: 解构会丢失this上下文
-const { request, get, post } = wxRequest;
-request('/api/users'); // 错误：this是undefined
+// ❌ 错误用法: 解构或单独传递方法会丢失this上下文
+const { request, get } = wxRequest;
+request('/api/users'); // 错误: this是undefined
 
-// ❌ 错误用法2: 单独传递方法也会丢失this上下文
 const myRequest = wxRequest.request;
-myRequest('/api/users'); // 错误：this是undefined
-
-// ❌ 错误用法3: 在回调函数中没有正确绑定this
-button.onclick = function() {
-  wxRequest.request('/api/data');  // 在某些环境中可能有问题
-};
+myRequest('/api/users'); // 错误: this是undefined
 ```
 
 #### 正确用法
 
 ```javascript
-// ✅ 正确用法1: 使用实例直接调用方法
-const wxRequest = WxRequest.create();
+// ✅ 正确用法1: 直接通过实例调用
 wxRequest.request('/api/users');
 wxRequest.get('/api/users');
 
@@ -466,21 +443,14 @@ request('/api/users');
 // ✅ 正确用法3: 使用箭头函数封装
 const request = (url, config) => wxRequest.request(url, config);
 request('/api/users');
-
-// ✅ 正确用法4: 在回调中使用箭头函数
-button.onclick = () => {
-  wxRequest.request('/api/data');
-};
 ```
 
-#### 最佳实践
+### 类型兼容性问题
 
-为避免this绑定问题，我们推荐：
+如果遇到TypeScript类型错误，可以尝试：
 
-1. 使用`WxRequest.create()`方法创建实例（而不是`new WxRequest()`）
-2. 总是通过实例直接调用方法，如`wxRequest.request()`
-3. 如果需要传递方法，请使用`bind`或箭头函数
-4. 避免对wxRequest实例进行解构
+1. 使用构建脚本 `./build.sh`
+2. 或手动运行 `npm run build --skipLibCheck`
 
 ## 版本兼容性
 
