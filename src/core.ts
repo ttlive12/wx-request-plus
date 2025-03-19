@@ -385,9 +385,13 @@ export default class WxRequest {
             return cachedResponse;
           }
           
-          // 在后台刷新缓存
+          // 在后台刷新缓存，但仅当cache !== 'force-cache'时
           if (config.cache !== 'force-cache') {
-            this.refreshCache(config, cacheKey);
+            setTimeout(() => {
+              this.refreshCache(config, cacheKey).catch(err => {
+                console.error('后台刷新缓存失败:', err);
+              });
+            }, 10);
           }
           
           return cachedResponse;
@@ -538,25 +542,30 @@ export default class WxRequest {
    */
   private async refreshCache(config: RequestConfig, cacheKey: string): Promise<void> {
     try {
-      // 创建一个新的配置，不使用缓存
+      // 创建一个全新的配置对象，确保与原配置完全隔离
       const refreshConfig = {
         ...config,
-        cache: false,
-        ignoreQueue: true,  // 忽略队列限制
-        priority: 1         // 低优先级
+        cache: false,           // 关闭缓存以避免循环
+        ignoreQueue: true,      // 强制跳过队列
+        priority: 1             // 低优先级
       };
       
-      // 静默发送请求
-      const response = await config.requestAdapter!(refreshConfig);
-      
-      // 更新缓存
-      if (config.cacheAdapter) {
-        const cacheExpire = config.cacheExpire || this.defaults.maxCacheAge;
-        await config.cacheAdapter.set(cacheKey, response, cacheExpire);
+      // 直接使用adapter发送请求，完全绕过队列和其他机制
+      if (config.requestAdapter) {
+        const response = await config.requestAdapter(refreshConfig);
+        
+        // 仅当请求成功时才更新缓存
+        if (config.cacheAdapter) {
+          const cacheExpire = config.cacheExpire || this.defaults.maxCacheAge;
+          await config.cacheAdapter.set(cacheKey, response, cacheExpire);
+          console.log('✅ 后台刷新的缓存已设置成功');
+        }
+      } else {
+        console.warn('⚠️ 无法刷新缓存：缺少请求适配器');
       }
     } catch (error) {
       // 刷新缓存失败，但不影响主流程，所以只记录错误
-      console.error('刷新缓存失败:', error);
+      console.error('❌ 刷新缓存失败:', error);
     }
   }
   

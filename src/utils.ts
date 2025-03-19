@@ -244,11 +244,27 @@ export function throttle<T extends (...args: any[]) => any>(
  * 判断请求是否应该被缓存
  */
 export function shouldCache(config: RequestConfig): boolean {
-  const { method = 'GET', cache } = config;
+  // 默认method为GET
+  const method = (config.method || 'GET').toUpperCase();
+  const { cache } = config;
   
-  // 只缓存GET请求，且cache不为false或no-cache
-  return method.toUpperCase() === 'GET' && 
-    (cache === true || cache === 'force-cache' || cache === 'only-if-cached');
+  // 如果cache明确设为false或'no-cache'，不缓存
+  if (cache === false || cache === 'no-cache') {
+    return false;
+  }
+  
+  // 只缓存GET请求
+  if (method !== 'GET') {
+    return false;
+  }
+  
+  // 以下情况启用缓存:
+  // 1. cache 为 true - 使用缓存并在后台刷新
+  // 2. cache 为 'force-cache' - 优先使用缓存，不刷新
+  // 3. cache 为 'only-if-cached' - 只使用缓存，没有缓存则失败
+  return cache === true || 
+         cache === 'force-cache' || 
+         cache === 'only-if-cached';
 }
 
 /**
