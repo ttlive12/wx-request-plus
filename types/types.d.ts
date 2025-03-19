@@ -28,6 +28,7 @@ export interface RequestConfig {
     showLoading?: boolean | LoadingOptions;
     extractField?: string | ((data: any) => any);
     skipExtract?: boolean;
+    returnData?: boolean;
     transformRequest?: (data: any, headers: Record<string, string>) => any;
     transformResponse?: (data: any, response: Response) => any;
     validateStatus?: (status: number) => boolean;
@@ -55,6 +56,7 @@ export interface WxRequestConfig extends RequestConfig {
     enableLoading?: boolean;
     loadingOptions?: LoadingOptions;
     extractField?: string | ((data: any) => any);
+    returnData?: boolean;
     requestAdapter?: RequestAdapter;
     cacheAdapter?: CacheAdapter;
     batchConfig?: BatchConfig;

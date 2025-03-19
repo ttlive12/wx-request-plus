@@ -11,7 +11,8 @@
     "clean": "gulp clean",
     "type-check": "tsc --noEmit",
     "prepublish": "npm run build",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "prepare": "husky install"
   },
   "miniprogram": "dist",
   "keywords": [
@@ -35,7 +36,9 @@
     "gulp-typescript": "^6.0.0-alpha.1",
     "gulp-sourcemaps": "^3.0.0",
     "gulp-clean": "^0.4.0",
-    "del": "^6.1.1"
+    "del": "^6.1.1",
+    "husky": "^8.0.0",
+    "lint-staged": "^15.2.0"
   },
   "dependencies": {
     "lru-cache": "^7.18.3"
