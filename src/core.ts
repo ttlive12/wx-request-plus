@@ -7,8 +7,8 @@ import {
   Method
 } from './types';
 import Interceptor from './interceptor';
-import LRUCacheAdapter from './adapters/cache';
-import wxRequestAdapter from './adapters/wx-request';
+import LRUCacheAdapter from './cache';
+import wxRequestAdapter from './wx-request';
 import RequestQueue from './queue';
 import BatchManager from './batch';
 import PreloadManager from './preload';

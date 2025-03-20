@@ -1,4 +1,4 @@
-import { CacheAdapter, Response } from '../types';
+import { CacheAdapter, Response } from './types';
 export default class LRUCacheAdapter implements CacheAdapter {
     private cache;
     constructor(options?: {

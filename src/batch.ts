@@ -1,5 +1,5 @@
 import { RequestConfig, BatchItem, Response, BatchConfig } from './types';
-import { generateRandomId, delay, deepMerge, get } from './utils';
+import { generateRandomId, deepMerge, get } from './utils';
 
 /**
  * 批处理管理器

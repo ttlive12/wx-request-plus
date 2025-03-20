@@ -5,16 +5,18 @@
   "main": "dist/index.js",
   "types": "types/index.d.ts",
   "scripts": {
-    "build": "gulp build",
-    "build:strict": "gulp build --strict",
-    "watch": "gulp watch",
-    "clean": "gulp clean",
-    "type-check": "tsc --noEmit",
-    "prepublish": "npm run build",
+    "dev": "gulp dev",
+    "watch": "gulp dev-watch",
+    "build": "gulp",
+    "gen_dts": "gulp dts",
     "test": "echo \"No tests specified yet\" && exit 0",
     "prepare": "husky install"
   },
   "miniprogram": "dist",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ttlive12/wx-request-plus.git"
+  },
   "keywords": [
     "微信",
     "小程序",
@@ -30,15 +32,26 @@
   "author": "Vinky",
   "license": "MIT",
   "devDependencies": {
-    "typescript": "^5.4.5",
-    "miniprogram-api-typings": "^4.0.0",
-    "gulp": "^4.0.2",
-    "gulp-typescript": "^6.0.0-alpha.1",
-    "gulp-sourcemaps": "^3.0.0",
-    "gulp-clean": "^0.4.0",
+    "@swc/cli": "^0.6.0",
+    "@swc/core": "^1.11.11",
+    "@types/gulp": "^4.0.17",
+    "@types/gulp-watch": "^4.1.39",
     "del": "^6.1.1",
-    "husky": "^8.0.0",
-    "lint-staged": "^15.2.0"
+    "esbuild": "^0.25.1",
+    "glass-easel": "^0.12.1",
+    "glass-easel-miniprogram-adapter": "^0.12.1",
+    "glass-easel-template-compiler": "^0.12.1",
+    "gulp": "^5.0.0",
+    "gulp-clean": "^0.4.0",
+    "gulp-esbuild": "^0.14.0",
+    "gulp-swc": "^2.2.0",
+    "gulp-typescript": "6.0.0-alpha.1",
+    "gulp-watch": "^5.0.1",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.2.0",
+    "miniprogram-api-typings": "^4.0.0",
+    "typescript": "^5.4.5",
+    "ts-node": "^10.9.2"
   },
   "dependencies": {
     "lru-cache": "^7.18.3"

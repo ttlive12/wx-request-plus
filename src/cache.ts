@@ -1,4 +1,4 @@
-import { CacheAdapter, Response } from '../types';
+import { CacheAdapter, Response } from './types';
 import LRUCache from 'lru-cache';
 
 /**

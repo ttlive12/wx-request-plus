@@ -1,5 +1,5 @@
-import { RequestAdapter, RequestConfig, Response, ErrorType } from '../types';
-import { createError, parseHeaders } from '../utils';
+import { RequestAdapter, RequestConfig, Response, ErrorType } from './types';
+import { createError, parseHeaders } from './utils';
 
 /**
  * 微信小程序请求适配器
