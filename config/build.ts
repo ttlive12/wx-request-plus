@@ -20,6 +20,11 @@ const swcOptions = {
     minify: {
       compress: {
         unused: true,
+        pure_funcs: [
+          'console.log',    // 移除 console.log
+          'console.debug',  // 移除 console.debug
+          'console.info'    // 移除 console.info
+        ]
       },
       mangle: true,
     },
