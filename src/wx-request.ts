@@ -103,7 +103,7 @@ const wxRequestAdapter: RequestAdapter = (config: RequestConfig): Promise<Respon
         reject(createError(
           err.errMsg || '请求失败',
           config,
-          undefined,
+          err.errno,
           undefined,
           undefined,
           errorType

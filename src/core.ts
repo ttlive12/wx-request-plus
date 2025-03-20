@@ -342,7 +342,7 @@ export default class WxRequest {
         
         // 如果配置了returnData为true，则只返回data部分
         if (shouldReturnData) {
-          return response.data;
+          return response.data ?? response;
         }
         
         // 否则返回完整response

@@ -130,7 +130,7 @@ export enum ErrorType {
 // 拦截器处理函数
 export interface InterceptorHandlers<T> {
   fulfilled: (value: T) => T | Promise<T>;
-  rejected?: (error: any) => any;
+  rejected?: (error: RequestError) => any;
 }
 
 // 拦截器接口
@@ -228,4 +228,4 @@ export interface MonitorData {
   errorRate: number;
   currentQueueSize: number;
   currentNetworkStatus: NetworkStatus;
-} 
+}
