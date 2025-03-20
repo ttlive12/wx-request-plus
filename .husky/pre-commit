@@ -4,4 +4,7 @@
 echo "🚀 开始构建项目..."
 npm run build
 
+echo "✅ 构建完成，准备暂存..."
+git add dist types
+
 echo "✅ 构建和暂存完成，准备提交..."
