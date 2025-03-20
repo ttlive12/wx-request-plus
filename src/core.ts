@@ -718,7 +718,7 @@ export default class WxRequest {
     if (!this || !this.preloadManager) {
       throw new Error('WxRequest实例的this上下文丢失。请使用wxRequest.preRequest()的方式调用，或使用bind绑定上下文。');
     }
-    return this.preloadManager.preload(config, this.sendRequest.bind(this));
+    return this.preloadManager.preload(config, this.request.bind(this));
   }
   
   /**
@@ -780,4 +780,4 @@ export default class WxRequest {
     // 隐藏所有加载提示
     this.loadingManager.hideAll();
   }
-} 
+}
