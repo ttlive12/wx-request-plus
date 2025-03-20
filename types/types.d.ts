@@ -92,7 +92,7 @@ export declare enum ErrorType {
 }
 export interface InterceptorHandlers<T> {
     fulfilled: (value: T) => T | Promise<T>;
-    rejected?: (error: any) => any;
+    rejected?: (error: RequestError) => any;
 }
 export interface Interceptor<T> {
     use(handlers: InterceptorHandlers<T>): number;
