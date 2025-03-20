@@ -1,6 +1,6 @@
 {
   "name": "wx-request-plus",
-  "version": "1.0.13",
+  "version": "1.0.14",
   "description": "增强型微信小程序请求库，支持错误处理、Promise、缓存、弱网处理、请求队列等功能",
   "main": "dist/index.js",
   "types": "types/index.d.ts",
