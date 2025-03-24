@@ -1,4 +1,4 @@
-import { InterceptorHandlers, InterceptorManager } from './types';
+import { InterceptorHandlers, InterceptorManager, RequestError } from './types';
 
 /**
  * 拦截器管理器实现
@@ -14,7 +14,7 @@ export default class Interceptor<T> implements InterceptorManager<T> {
    */
   use(
     fulfilled: (value: T) => T | Promise<T>,
-    rejected?: (error: any) => any
+    rejected?: (error: RequestError) => any
   ): number {
     this.handlers.push({
       fulfilled,

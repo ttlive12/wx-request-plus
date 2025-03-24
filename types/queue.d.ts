@@ -1,4 +1,4 @@
-import { RequestConfig, Response } from './types';
+import { QueueItem, RequestConfig } from './types';
 export default class RequestQueue {
     private queue;
     private processing;
@@ -11,7 +11,7 @@ export default class RequestQueue {
         maxConcurrent?: number;
         enableOfflineQueue?: boolean;
     });
-    enqueue(config: RequestConfig, executor: () => Promise<Response>): Promise<Response>;
+    enqueue(item: QueueItem): void;
     cancel(predicate: (config: RequestConfig) => boolean): void;
     clear(): void;
     getStatus(): {

@@ -8,9 +8,7 @@ export default class WxRequest {
     };
     private cacheAdapter;
     private requestQueue;
-    private batchManager;
     private preloadManager;
-    private loadingManager;
     static create(config?: WxRequestConfig): WxRequest;
     constructor(config?: WxRequestConfig);
     request<T = any>(config: RequestConfig & {
@@ -42,9 +40,10 @@ export default class WxRequest {
     }): Promise<Response<T>>;
     request<T = any>(url: string, data: any, config?: RequestConfig): Promise<Response<T> | T>;
     private sendRequest;
-    private handleLoading;
+    private prepareFinalConfig;
     private performRequest;
     private handleRequestError;
+    private enhanceErrorMessage;
     private cacheResponse;
     private refreshCache;
     get<T = any>(url: string, config?: RequestConfig & {
@@ -83,12 +82,6 @@ export default class WxRequest {
     options<T = any>(url: string, config?: RequestConfig & {
         returnData: false;
     }): Promise<Response<T>>;
-    batch<T = any>(requests: RequestConfig[], config?: RequestConfig & {
-        returnData?: true;
-    }): Promise<T[]>;
-    batch<T = any>(requests: RequestConfig[], config?: RequestConfig & {
-        returnData: false;
-    }): Promise<Response<T>[]>;
     preRequest(config: RequestConfig & {
         preloadKey: string;
     }): Promise<void>;
@@ -112,4 +105,9 @@ export default class WxRequest {
         };
     };
     cancelAll(): void;
+    all<T>(requests: Array<Promise<T>>): Promise<T[]>;
+    all<T extends any[]>(requests: [...{
+        [K in keyof T]: Promise<T[K]>;
+    }]): Promise<T>;
+    spread<T, R>(callback: (...args: T[]) => R): (arr: T[]) => R;
 }

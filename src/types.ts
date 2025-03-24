@@ -6,14 +6,6 @@ export type CacheMode = boolean | 'force-cache' | 'only-if-cached' | 'no-cache';
 
 type a = WechatMiniprogram.RequestOption
 
-// 加载提示配置
-export interface LoadingOptions {
-  title?: string;               // 提示文字
-  mask?: boolean;               // 是否显示透明蒙层
-  delay?: number;               // 延迟显示时间(ms)，避免请求过快时闪烁
-  customLoader?: (show: boolean, options?: LoadingOptions) => void; // 自定义loading实现
-}
-
 // 请求配置接口
 export interface RequestConfig {
   url?: string;                     // 请求URL
@@ -38,13 +30,6 @@ export interface RequestConfig {
   priority?: number;                // 优先级(1-10，10为最高)
   cancelOnNavigate?: boolean;       // 页面跳转时是否取消
   ignoreQueue?: boolean;            // 是否忽略队列限制
-  groupKey?: string;                // 分组键（相同组的请求可以进行合并）
-  
-  // 批处理相关
-  batchConfig?: Partial<BatchConfig>; // 批量请求配置
-  
-  // 加载提示相关
-  showLoading?: boolean | LoadingOptions; // 是否显示加载提示或加载提示配置
   
   // 响应处理相关
   extractField?: string | ((data: any) => any); // 自动提取响应中的特定字段路径，如"data"或"data.list"，或自定义提取函数
@@ -83,13 +68,10 @@ export interface WxRequestConfig extends RequestConfig {
   enableQueue?: boolean;            // 是否启用请求队列
   maxConcurrent?: number;           // 最大并发请求数
   enableOfflineQueue?: boolean;     // 无网络时是否进入离线队列
-  enableLoading?: boolean;          // 全局是否启用加载提示
-  loadingOptions?: LoadingOptions;  // 全局加载提示配置
   extractField?: string | ((data: any) => any); // 自动提取响应中的特定字段路径，如"data"或"data.list"，或自定义提取函数
   returnData?: boolean;             // 是否直接返回响应数据而非完整Response对象
   requestAdapter?: RequestAdapter;  // 请求适配器
   cacheAdapter?: CacheAdapter;      // 缓存适配器
-  batchConfig?: BatchConfig;        // 批量请求配置
 }
 
 // 响应接口
@@ -114,6 +96,7 @@ export interface RequestError extends Error {
   request?: any;                    // 原始请求对象
   type?: ErrorType;                 // 错误类型
   retryCount?: number;              // 已重试次数
+  originalError?: any;              // 原始错误对象
 }
 
 // 错误类型枚举
@@ -142,7 +125,7 @@ export interface Interceptor<T> {
 // 拦截器管理器
 export interface InterceptorManager<T> {
   handlers: Array<InterceptorHandlers<T> | null>;
-  use(fulfilled: (value: T) => T | Promise<T>, rejected?: (error: any) => any): number;
+  use(fulfilled: (value: T) => T | Promise<T>, rejected?: (error: RequestError) => any): number;
   eject(id: number): void;
   forEach(fn: (handler: InterceptorHandlers<T>) => void): void;
 }
@@ -167,41 +150,6 @@ export interface QueueItem {
   timestamp: number;
   priority: number;
   status: 'pending' | 'processing' | 'completed' | 'failed';
-}
-
-// 批处理项
-export interface BatchItem {
-  config: RequestConfig;
-  resolve: (value: Response) => void;
-  reject: (reason: any) => void;
-}
-
-// 批处理配置
-export interface BatchConfig {
-  // 批量请求URL，默认为"/batch"
-  batchUrl?: string;
-  // 响应数据路径，指定批量响应结果在返回数据中的路径，如"data.results"
-  responsePath?: string;
-  // 请求合并方式：'json'(默认)将多个请求合并为一个数组发送，'form'使用FormData发送
-  batchMode?: 'json' | 'form';
-  // 自定义请求数据转换器，用于自定义批量请求的数据格式
-  transformBatchRequest?: (requests: any[]) => any;
-  // 自定义响应数据转换器，用于从批量响应中提取单个响应
-  transformBatchResponse?: (batchResponse: Response, originalRequests: BatchItem[]) => any[];
-  // HTTP方法
-  method?: Method;
-  // 基础URL
-  baseURL?: string;
-  // 请求头
-  headers?: Record<string, string>;
-  // 超时时间
-  timeout?: number;
-  // 批量处理的请求字段名，默认为"requests"
-  requestsFieldName?: string;
-  // 自动批处理的时间间隔(ms)
-  batchInterval?: number;
-  // 单个批处理的最大请求数
-  batchMaxSize?: number;
 }
 
 // 网络状态

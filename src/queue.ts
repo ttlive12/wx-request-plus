@@ -30,90 +30,48 @@ export default class RequestQueue {
   
   /**
    * 添加请求到队列
-   * @param config 请求配置
-   * @param executor 请求执行函数，负责实际执行请求
-   * @returns Promise
+   * @param item 队列项
+   * @returns 无返回值
    */
-  enqueue(config: RequestConfig, executor: () => Promise<Response>): Promise<Response> {
-    return new Promise<Response>((resolve, reject) => {
-      const priority = getPriority(config);
-      
-      // 创建队列项
-      const queueItem: QueueItem = {
-        config,
-        execute: () => {
-          
-          // 使用传入的executor函数执行请求，并处理结果
-          return executor()
-            .then(response => {
-              resolve(response);
-              return Promise.resolve();
-            })
-            .catch(error => {
-              reject(error);
-              return Promise.resolve(); // 确保即使出错，Promise也会resolve，以便队列继续处理
-            });
-        },
-        timestamp: Date.now(),
-        priority,
-        status: 'pending'
-      };
-      
-      // 检查请求是否忽略队列
-      if (config.ignoreQueue) {
-        this.processItem(queueItem);
-        return;
-      }
-      
-      // 检查网络状态
-      if (!this.isNetworkAvailable) {
-        if (this.enableOfflineQueue) {
-          this.offlineQueue.push(queueItem);
-        } else {
-          reject(createError(
-            '网络不可用',
-            config,
-            undefined,
-            undefined,
-            undefined,
-            ErrorType.OFFLINE
-          ));
-        }
-        return;
-      }
-      
-      // 添加到队列并按优先级排序
-      this.queue.push(queueItem);
-      this.sortQueue();
-      
-      // 尝试处理队列
+  enqueue(item: QueueItem): void {
+    // 检查网络状态
+    if (!this.isNetworkAvailable && this.enableOfflineQueue) {
+      // 无网络时添加到离线队列
+      this.offlineQueue.push(item);
+      return;
+    }
+    
+    // 添加到主队列
+    this.queue.push(item);
+    
+    // 按优先级排序
+    this.sortQueue();
+    
+    // 如果没有在处理，则开始处理队列
+    if (!this.isProcessing) {
       this.processQueue();
-    });
+    }
   }
   
   /**
-   * 取消请求
-   * @param predicate 取消条件
+   * 取消队列中的请求
+   * @param predicate 断言函数，用于确定哪些请求应该被取消
    */
   cancel(predicate: (config: RequestConfig) => boolean): void {
-    // 取消待处理队列中的请求
-    this.queue = this.queue.filter(item => {
-      if (predicate(item.config)) {
-        // 不再需要调用reject，因为队列项现在没有reject函数
-        return false;
-      }
-      return true;
-    });
+    // 从队列中找出要取消的项并移除
+    const toCancel = this.queue.filter(item => predicate(item.config));
+    this.queue = this.queue.filter(item => !predicate(item.config));
     
-    // 取消离线队列中的请求
-    this.offlineQueue = this.offlineQueue.filter(item => {
-      if (predicate(item.config)) {
-        return false;
-      }
-      return true;
-    });
+    // 从处理中的请求找出要取消的项
+    const processingToCancel = this.processing.filter(item => predicate(item.config));
     
-    // 注意：正在处理的请求需要通过cancelToken取消
+    // 对每个找到的项执行取消操作
+    [...toCancel, ...processingToCancel].forEach(item => {
+      if (item.status === 'pending' || item.status === 'processing') {
+        // 标记为失败
+        item.status = 'failed';
+      }
+    });
   }
   
   /**

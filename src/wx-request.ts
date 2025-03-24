@@ -1,4 +1,4 @@
-import { RequestAdapter, RequestConfig, Response, ErrorType } from './types';
+import { RequestAdapter, RequestConfig, Response, ErrorType, RequestError } from './types';
 import { createError, parseHeaders } from './utils';
 
 /**
@@ -90,24 +90,47 @@ const wxRequestAdapter: RequestAdapter = (config: RequestConfig): Promise<Respon
       fail(err) {
         // 处理错误响应
         let errorType: ErrorType = ErrorType.UNKNOWN;
+        let errorMessage = err.errMsg || '请求失败';
         
-        // 分析错误类型
+        // 详细分析错误类型
         if (err.errMsg) {
           if (err.errMsg.includes('timeout')) {
             errorType = ErrorType.TIMEOUT;
+            errorMessage = '请求超时';
+          } else if (err.errMsg.includes('abort')) {
+            errorType = ErrorType.CANCEL;
+            errorMessage = '请求已取消';
           } else if (err.errMsg.includes('fail')) {
-            errorType = ErrorType.NETWORK;
+            // 进一步细分网络错误类型
+            if (err.errMsg.includes('断开') || err.errMsg.includes('disconnect')) {
+              errorType = ErrorType.NETWORK;
+              errorMessage = '网络连接断开';
+            } else if (err.errMsg.includes('超时') || err.errMsg.includes('timeout')) {
+              errorType = ErrorType.TIMEOUT;
+              errorMessage = '请求超时';
+            } else if (err.errMsg.includes('找不到') || err.errMsg.includes('not found')) {
+              errorType = ErrorType.CLIENT;
+              errorMessage = '未找到请求地址';
+            } else {
+              errorType = ErrorType.NETWORK;
+              errorMessage = '网络请求失败';
+            }
           }
         }
         
-        reject(createError(
-          err.errMsg || '请求失败',
+        const error = createError(
+          errorMessage,
           config,
-          err.errno,
-          undefined,
-          undefined,
+          0, // 微信小程序的错误对象没有statusCode
+          undefined, // 微信小程序的错误对象没有data
+          undefined, // 微信小程序的错误对象没有header
           errorType
-        ));
+        );
+        
+        // 添加原始错误对象，方便调试
+        error.originalError = err;
+        
+        reject(error);
       }
     };
 
@@ -122,8 +145,25 @@ const wxRequestAdapter: RequestAdapter = (config: RequestConfig): Promise<Respon
       requestOptions.responseType = responseType;
     }
     
-    // 创建请求任务
-    const requestTask = wx.request(requestOptions);
+    let requestTask: WechatMiniprogram.RequestTask | null = null;
+    
+    try {
+      // 创建请求任务
+      requestTask = wx.request(requestOptions);
+    } catch (e) {
+      // 处理请求创建失败的情况
+      const error = createError(
+        `创建请求失败: ${(e as Error).message}`,
+        config,
+        0,
+        undefined,
+        undefined,
+        ErrorType.CLIENT
+      );
+      error.originalError = e;
+      reject(error);
+      return;
+    }
     
     // 处理请求进度回调，使用更兼容的方式
     try {
@@ -146,21 +186,30 @@ const wxRequestAdapter: RequestAdapter = (config: RequestConfig): Promise<Respon
         // @ts-ignore - 不同版本微信类型定义可能不包含此属性
         if (typeof requestTask.abort === 'function') {
           config.cancelToken.promise.then((reason: string) => {
-            // @ts-ignore
-            requestTask.abort();
-            reject(createError(
-              reason || '请求已取消',
-              config,
-              undefined,
-              undefined,
-              undefined,
-              ErrorType.CANCEL
-            ));
+            if (requestTask) {
+              try {
+                // @ts-ignore
+                requestTask.abort();
+              } catch (e) {
+                console.warn('取消请求操作失败', e);
+              }
+              
+              reject(createError(
+                reason || '请求已取消',
+                config,
+                undefined,
+                undefined,
+                undefined,
+                ErrorType.CANCEL
+              ));
+            }
+          }).catch(e => {
+            console.error('处理取消令牌时出错', e);
           });
         }
       }
     } catch (e) {
-      console.warn('取消请求操作失败', e);
+      console.warn('设置取消请求操作失败', e);
     }
   });
 };

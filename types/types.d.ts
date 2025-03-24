@@ -1,11 +1,5 @@
 export type Method = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'HEAD' | 'OPTIONS' | 'TRACE' | 'CONNECT';
 export type CacheMode = boolean | 'force-cache' | 'only-if-cached' | 'no-cache';
-export interface LoadingOptions {
-    title?: string;
-    mask?: boolean;
-    delay?: number;
-    customLoader?: (show: boolean, options?: LoadingOptions) => void;
-}
 export interface RequestConfig {
     url?: string;
     baseURL?: string;
@@ -23,9 +17,6 @@ export interface RequestConfig {
     priority?: number;
     cancelOnNavigate?: boolean;
     ignoreQueue?: boolean;
-    groupKey?: string;
-    batchConfig?: Partial<BatchConfig>;
-    showLoading?: boolean | LoadingOptions;
     extractField?: string | ((data: any) => any);
     skipExtract?: boolean;
     returnData?: boolean;
@@ -53,13 +44,10 @@ export interface WxRequestConfig extends RequestConfig {
     enableQueue?: boolean;
     maxConcurrent?: number;
     enableOfflineQueue?: boolean;
-    enableLoading?: boolean;
-    loadingOptions?: LoadingOptions;
     extractField?: string | ((data: any) => any);
     returnData?: boolean;
     requestAdapter?: RequestAdapter;
     cacheAdapter?: CacheAdapter;
-    batchConfig?: BatchConfig;
 }
 export interface Response<T = any> {
     data: T;
@@ -80,6 +68,7 @@ export interface RequestError extends Error {
     request?: any;
     type?: ErrorType;
     retryCount?: number;
+    originalError?: any;
 }
 export declare enum ErrorType {
     TIMEOUT = "TIMEOUT",
@@ -100,7 +89,7 @@ export interface Interceptor<T> {
 }
 export interface InterceptorManager<T> {
     handlers: Array<InterceptorHandlers<T> | null>;
-    use(fulfilled: (value: T) => T | Promise<T>, rejected?: (error: any) => any): number;
+    use(fulfilled: (value: T) => T | Promise<T>, rejected?: (error: RequestError) => any): number;
     eject(id: number): void;
     forEach(fn: (handler: InterceptorHandlers<T>) => void): void;
 }
@@ -119,25 +108,6 @@ export interface QueueItem {
     timestamp: number;
     priority: number;
     status: 'pending' | 'processing' | 'completed' | 'failed';
-}
-export interface BatchItem {
-    config: RequestConfig;
-    resolve: (value: Response) => void;
-    reject: (reason: any) => void;
-}
-export interface BatchConfig {
-    batchUrl?: string;
-    responsePath?: string;
-    batchMode?: 'json' | 'form';
-    transformBatchRequest?: (requests: any[]) => any;
-    transformBatchResponse?: (batchResponse: Response, originalRequests: BatchItem[]) => any[];
-    method?: Method;
-    baseURL?: string;
-    headers?: Record<string, string>;
-    timeout?: number;
-    requestsFieldName?: string;
-    batchInterval?: number;
-    batchMaxSize?: number;
 }
 export interface NetworkStatus {
     isConnected: boolean;

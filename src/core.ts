@@ -3,16 +3,14 @@ import {
   RequestConfig,
   Response,
   RequestError,
-  LoadingOptions,
-  Method
+  Method,
+  ErrorType
 } from './types';
 import Interceptor from './interceptor';
 import LRUCacheAdapter from './cache';
 import wxRequestAdapter from './wx-request';
 import RequestQueue from './queue';
-import BatchManager from './batch';
 import PreloadManager from './preload';
-import LoadingManager from './loading';
 import {
   deepMerge,
   buildURL,
@@ -40,9 +38,7 @@ export default class WxRequest {
   // 组件管理器
   private cacheAdapter: LRUCacheAdapter;
   private requestQueue: RequestQueue;
-  private batchManager: BatchManager;
   private preloadManager: PreloadManager;
-  private loadingManager: LoadingManager;
   
   /**
    * 静态工厂方法，创建WxRequest实例
@@ -75,30 +71,8 @@ export default class WxRequest {
       enableQueue: true,
       maxConcurrent: 10,
       enableOfflineQueue: true,
-      enableLoading: false, // 默认不启用全局loading
-      loadingOptions: {
-        title: '加载中...',
-        mask: false,
-        delay: 300
-      },
-      // 默认的批量请求配置
-      batchConfig: {
-        batchUrl: '/batch',
-        batchMode: 'json',
-        requestsFieldName: 'requests',
-        batchInterval: 50,
-        batchMaxSize: 5
-      },
       ...config
     };
-    
-    // 合并批量请求配置
-    if (config.batchConfig) {
-      this.defaults.batchConfig = {
-        ...this.defaults.batchConfig,
-        ...config.batchConfig
-      };
-    }
     
     // 初始化组件
     this.cacheAdapter = new LRUCacheAdapter({
@@ -111,26 +85,7 @@ export default class WxRequest {
       enableOfflineQueue: this.defaults.enableOfflineQueue
     });
     
-    // 确保batchConfig存在
-    const batchConfig = this.defaults.batchConfig || {
-      batchUrl: '/batch',
-      batchMode: 'json',
-      requestsFieldName: 'requests',
-      batchInterval: 50,
-      batchMaxSize: 5
-    };
-    
-    this.batchManager = new BatchManager({
-      maxBatchSize: batchConfig.batchMaxSize,
-      batchInterval: batchConfig.batchInterval,
-      batchUrl: batchConfig.batchUrl,
-      batchMode: batchConfig.batchMode,
-      requestsFieldName: batchConfig.requestsFieldName
-    });
-    
     this.preloadManager = new PreloadManager();
-    
-    this.loadingManager = new LoadingManager(this.defaults.loadingOptions);
     
     // 初始化拦截器
     this.interceptors = {
@@ -146,7 +101,6 @@ export default class WxRequest {
     this.delete = this.delete.bind(this);
     this.head = this.head.bind(this);
     this.options = this.options.bind(this);
-    this.batch = this.batch.bind(this);
     this.preRequest = this.preRequest.bind(this);
     this.clearCache = this.clearCache.bind(this);
     this.cancelRequests = this.cancelRequests.bind(this);
@@ -157,7 +111,9 @@ export default class WxRequest {
     this.handleRequestError = this.handleRequestError.bind(this);
     this.cacheResponse = this.cacheResponse.bind(this);
     this.refreshCache = this.refreshCache.bind(this);
-    this.handleLoading = this.handleLoading.bind(this);
+    this.enhanceErrorMessage = this.enhanceErrorMessage.bind(this);
+    this.all = this.all.bind(this);
+    this.spread = this.spread.bind(this);
   }
   
   /**
@@ -262,7 +218,7 @@ export default class WxRequest {
       }
       
       // 设置缓存适配器
-      if (!config.cacheAdapter) {
+      if (!config.cacheAdapter && shouldCache(config)) {
         config.cacheAdapter = self.cacheAdapter;
       }
       
@@ -361,11 +317,7 @@ export default class WxRequest {
    * @param config 请求配置
    */
   private async sendRequest(config: RequestConfig): Promise<Response> {
-    // 处理加载提示
-    let hideLoading: (() => void) | null = null;
     try {
-      hideLoading = this.handleLoading(config);
-      
       // 检查是否有预加载响应
       if (config.preloadKey && this.preloadManager.hasPreloadResponse(config.preloadKey)) {
         const preloadedResponse = this.preloadManager.getPreloadResponse(config.preloadKey);
@@ -400,93 +352,107 @@ export default class WxRequest {
       
       // 没有缓存，发送实际请求
       return this.performRequest(config);
-    } finally {
-      // 确保在所有情况下都隐藏加载提示
-      if (hideLoading) {
-        hideLoading();
+    } catch (error) {
+      console.error('WxRequest.sendRequest调用失败:', error);
+      return Promise.reject(error);
+    }
+  }
+  
+  /**
+   * 准备最终请求配置
+   * @param config 请求配置
+   * @returns 合并后的最终配置
+   */
+  private prepareFinalConfig(config: RequestConfig): RequestConfig {
+    // 合并默认配置和请求配置
+    const finalConfig = deepMerge(this.defaults, config) as RequestConfig;
+
+    // 构建完整URL
+    if (finalConfig.baseURL && finalConfig.url && !finalConfig.url.startsWith('http')) {
+      finalConfig.url = buildURL(finalConfig.baseURL, finalConfig.url);
+    }
+
+    // 合并URL参数
+    if (finalConfig.params && finalConfig.url) {
+      const queryString = Object.keys(finalConfig.params)
+        .map(key => `${encodeURIComponent(key)}=${encodeURIComponent(finalConfig.params![key])}`)
+        .join('&');
+      
+      if (queryString) {
+        finalConfig.url = `${finalConfig.url}${finalConfig.url.includes('?') ? '&' : '?'}${queryString}`;
       }
     }
-  }
-  
-  /**
-   * 处理加载提示的显示
-   * @param config 请求配置
-   * @returns 隐藏加载提示的函数
-   */
-  private handleLoading(config: RequestConfig): (() => void) | null {
-    // 确定是否显示加载提示
-    const shouldShowLoading = config.showLoading !== undefined 
-      ? config.showLoading 
-      : this.defaults.enableLoading;
-    
-    if (!shouldShowLoading) {
-      return null;
+
+    // 确保请求适配器存在
+    if (!finalConfig.requestAdapter) {
+      finalConfig.requestAdapter = wxRequestAdapter;
     }
     
-    // 获取加载选项
-    let loadingOptions: LoadingOptions | undefined;
-    if (typeof config.showLoading === 'object') {
-      loadingOptions = config.showLoading;
-    } else {
-      loadingOptions = this.defaults.loadingOptions;
+    // 确保缓存适配器存在
+    if (!finalConfig.cacheAdapter && shouldCache(finalConfig)) {
+      finalConfig.cacheAdapter = this.cacheAdapter;
     }
-    
-    // 使用请求的groupKey或URL作为loading分组键
-    const groupKey = config.groupKey || config.url || 'global';
-    
-    // 显示加载提示
-    return this.loadingManager.show(groupKey, loadingOptions);
+
+    return finalConfig;
   }
-  
+
   /**
-   * 执行实际请求
+   * 发送实际请求
    * @param config 请求配置
+   * @returns 响应承诺
    */
   private async performRequest(config: RequestConfig): Promise<Response> {
-
     // 定义直接执行请求的函数
     const directExecute = async (): Promise<Response> => {
-      console.log('📡 直接执行请求:', {
-        url: config.url,
-        method: config.method
-      });
+      // 准备最终请求配置
+      const finalConfig = this.prepareFinalConfig(config);
+      
+      // 使用适配器发送请求
+      const adapter = finalConfig.requestAdapter || wxRequestAdapter;
       
       try {
-        // 直接发送请求
-        const response = await config.requestAdapter!(config);
+        // 发送请求
+        const response = await adapter(finalConfig);
         
         // 缓存响应
-        this.cacheResponse(config, response);
+        this.cacheResponse(finalConfig, response);
         
         return response;
       } catch (error) {
         // 处理错误和重试
-        return this.handleRequestError(error as RequestError, config);
+        return this.handleRequestError(error as RequestError, finalConfig);
       }
     };
     
-    // 决定请求的执行方式（直接执行或加入队列）
-    let executeRequest: () => Promise<Response>;
-    
-    // 如果启用队列，让队列管理请求的执行时机，但执行逻辑仍使用directExecute
-    if (this.defaults.enableQueue && !config.ignoreQueue) {
-      executeRequest = () => this.requestQueue.enqueue(config, directExecute);
-    } else {
-      executeRequest = directExecute;
+    // 如果请求队列已禁用或请求被标记为忽略队列，直接执行
+    if (!this.defaults.enableQueue || config.ignoreQueue) {
+      return directExecute();
     }
     
-    // 如果开启了批处理并且有groupKey，交给批处理
-    if (config.groupKey && this.defaults.batchInterval! > 0) {
-      return this.batchManager.addToBatch(config, config.requestAdapter!);
-    }
-    
-    return executeRequest();
+    // 将请求添加到队列中
+    return new Promise<Response>((resolve, reject) => {
+      this.requestQueue.enqueue({
+        config,
+        execute: async () => {
+          try {
+            const response = await directExecute();
+            resolve(response);
+          } catch (error) {
+            reject(error);
+          }
+        },
+        priority: config.priority || 5,
+        timestamp: Date.now(),
+        status: 'pending'
+      });
+    });
   }
   
   /**
    * 处理请求错误
-   * @param error 错误
+   * @param error 错误对象
    * @param config 请求配置
+   * @returns 重试后的响应或抛出错误
    */
   private async handleRequestError(error: RequestError, config: RequestConfig): Promise<Response> {
     // 获取重试次数
@@ -494,10 +460,20 @@ export default class WxRequest {
     const maxRetries = typeof config.retry === 'number' ? config.retry : 
                        (config.retry === true ? this.defaults.retryTimes || 0 : 0);
     
-    // 检查是否需要重试
+    // 增强错误信息
+    if (!error.type) {
+      error.type = ErrorType.UNKNOWN;
+    }
+    
+    // 标记重试次数
+    error.retryCount = retryCount;
+    
+    // 检查是否需要重试 - 只有网络错误和服务器错误才会重试
     if (
       retryCount < maxRetries && 
-      (isNetworkError(error) || (error.status && error.status >= 500))
+      (error.type === ErrorType.NETWORK || 
+       error.type === ErrorType.TIMEOUT || 
+       (error.status && error.status >= 500))
     ) {
       // 增加重试计数
       error.retryCount = retryCount + 1;
@@ -505,20 +481,67 @@ export default class WxRequest {
       // 计算延迟
       let retryDelay = config.retryDelay || this.defaults.retryDelay || 1000;
       
-      // 如果使用递增延迟
+      // 如果使用递增延迟，每次重试增加延迟时间
       if (config.retryIncrementalDelay) {
         retryDelay = retryDelay * (error.retryCount);
       }
       
-      // 延迟后重试
-      await delay(retryDelay);
+      console.log(`请求重试 (${error.retryCount}/${maxRetries}): ${config.url}, 延迟: ${retryDelay}ms`);
       
-      // 重试请求
-      return this.performRequest(config);
+      // 延迟后重试
+      try {
+        await delay(retryDelay);
+        // 重试请求
+        return this.performRequest(config);
+      } catch (retryError) {
+        // 如果重试也失败，将重试次数传递给新错误
+        if (retryError && typeof retryError === 'object') {
+          (retryError as RequestError).retryCount = error.retryCount;
+        }
+        throw retryError;
+      }
     }
     
-    // 超过重试次数，抛出错误
+    // 超过重试次数，抛出详细错误
+    error.message = this.enhanceErrorMessage(error);
+    
+    // 抛出错误
     throw error;
+  }
+  
+  /**
+   * 增强错误信息，提供更详细的描述
+   * @param error 错误对象
+   * @returns 增强后的错误信息
+   */
+  private enhanceErrorMessage(error: RequestError): string {
+    let message = error.message || '未知错误';
+    
+    // 添加请求URL信息
+    if (error.config && error.config.url) {
+      const baseURL = error.config.baseURL || '';
+      const url = error.config.url;
+      const fullUrl = url.startsWith('http') ? url : `${baseURL}${url}`;
+      
+      message = `${message} [${error.config.method || 'GET'} ${fullUrl}]`;
+    }
+    
+    // 添加错误类型信息
+    if (error.type) {
+      message = `${message} (类型: ${error.type})`;
+    }
+    
+    // 添加HTTP状态码信息
+    if (error.status) {
+      message = `${message} (状态码: ${error.status})`;
+    }
+    
+    // 添加重试信息
+    if (error.retryCount !== undefined && error.retryCount > 0) {
+      message = `${message} (已重试: ${error.retryCount}次)`;
+    }
+    
+    return message;
   }
   
   /**
@@ -527,11 +550,16 @@ export default class WxRequest {
    * @param response 响应
    */
   private async cacheResponse(config: RequestConfig, response: Response): Promise<void> {
-    if (shouldCache(config) && config.cacheAdapter) {
-      const cacheKey = generateCacheKey(config);
-      const cacheExpire = config.cacheExpire || this.defaults.maxCacheAge;
-      
-      await config.cacheAdapter.set(cacheKey, response, cacheExpire);
+    try {
+      if (shouldCache(config) && config.cacheAdapter && typeof config.cacheAdapter.set === 'function') {
+        const cacheKey = generateCacheKey(config);
+        const cacheExpire = config.cacheExpire || this.defaults.maxCacheAge;
+        
+        await config.cacheAdapter.set(cacheKey, response, cacheExpire);
+      }
+    } catch (error) {
+      console.error('缓存响应失败:', error);
+      // 缓存失败不影响主流程，只记录错误
     }
   }
   
@@ -688,29 +716,6 @@ export default class WxRequest {
   }
   
   /**
-   * 批量请求
-   * @param requests 请求配置数组
-   * @param config 批处理配置
-   * @returns 批量响应结果
-   */
-  batch<T = any>(requests: RequestConfig[], config?: RequestConfig & { returnData?: true }): Promise<T[]>;
-  batch<T = any>(requests: RequestConfig[], config?: RequestConfig & { returnData: false }): Promise<Response<T>[]>;
-  batch<T = any>(requests: RequestConfig[], config: RequestConfig = {}): Promise<(Response<T> | T)[]> {
-    if (!this || !this.batchManager) {
-      throw new Error('WxRequest实例的this上下文丢失。请使用wxRequest.batch()的方式调用，或使用bind绑定上下文。');
-    }
-    return this.batchManager.executeBatch(
-      requests.map(req => deepMerge(config, req)),
-      this.sendRequest.bind(this)
-    ).then(responses => {
-      if (config.returnData !== undefined ? config.returnData : this.defaults.returnData) {
-        return responses.map(response => response.data);
-      }
-      return responses;
-    });
-  }
-  
-  /**
    * 预请求
    * @param config 预请求配置
    */
@@ -768,16 +773,35 @@ export default class WxRequest {
   }
   
   /**
-   * 取消所有请求和加载提示
+   * 取消所有请求
    */
   cancelAll(): void {
-    if (!this || !this.loadingManager) {
-      throw new Error('WxRequest实例的this上下文丢失。请使用wxRequest.cancelAll()的方式调用，或使用bind绑定上下文。');
+    if (!this || !this) {
+      throw new Error(
+        'WxRequest实例的this上下文丢失。请使用wxRequest.cancelAll()的方式调用，或使用bind绑定上下文。'
+      );
     }
-    // 取消所有请求
-    this.cancelRequests(() => true);
     
-    // 隐藏所有加载提示
-    this.loadingManager.hideAll();
+    this.cancelRequests(() => true);
+  }
+
+  /**
+   * 同时发送多个请求
+   * @param requests 请求数组
+   * @returns Promise，将在所有请求完成时解析
+   */
+  all<T>(requests: Array<Promise<T>>): Promise<T[]>;
+  all<T extends any[]>(requests: [...{ [K in keyof T]: Promise<T[K]> }]): Promise<T>;
+  all(requests: Array<Promise<any>>): Promise<any[]> {
+    return Promise.all(requests);
+  }
+  
+  /**
+   * 将数组参数分散到函数参数中
+   * @param callback 回调函数
+   * @returns 接收数组并应用回调的函数
+   */
+  spread<T, R>(callback: (...args: T[]) => R): (arr: T[]) => R {
+    return (arr: T[]) => callback(...arr);
   }
 }
