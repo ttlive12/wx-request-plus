@@ -20,3 +20,4 @@ export declare function isJSONData(data: any): boolean;
 export declare function generateRandomId(): string;
 export declare function get(obj: any, path: string, defaultValue?: any): any;
 export declare function getValueByPath(obj: any, path: string, defaultValue?: any): any;
+export declare function sha256(str: string): string;

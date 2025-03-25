@@ -58,7 +58,7 @@ export default class WxRequest {
     // 初始化默认配置
     this.defaults = {
       baseURL: '',
-      timeout: 30000,
+      timeout: 10000,
       headers: {
         'Content-Type': 'application/json'
       },
@@ -222,10 +222,8 @@ export default class WxRequest {
         config.cacheAdapter = self.cacheAdapter;
       }
       
-      // 处理请求URL
-      if (config.url) {
-        config.url = buildURL(config.url, config.baseURL, config.params);
-      }
+      // 注意：不再在这里构建完整URL，而是延迟到prepareFinalConfig中进行
+      // 这样可以确保缓存键的生成逻辑一致性
       
       // 初始化请求链
       let chain: Array<any> = [self.sendRequest.bind(self), undefined];
@@ -318,40 +316,60 @@ export default class WxRequest {
    */
   private async sendRequest(config: RequestConfig): Promise<Response> {
     try {
+      // 准备最终配置，确保URL和参数已经处理完毕，这样生成的缓存键才一致
+      const finalConfig = this.prepareFinalConfig(config);
+      
       // 检查是否有预加载响应
-      if (config.preloadKey && this.preloadManager.hasPreloadResponse(config.preloadKey)) {
-        const preloadedResponse = this.preloadManager.getPreloadResponse(config.preloadKey);
+      if (finalConfig.preloadKey && this.preloadManager.hasPreloadResponse(finalConfig.preloadKey)) {
+        const preloadedResponse = this.preloadManager.getPreloadResponse(finalConfig.preloadKey);
         if (preloadedResponse) {
           return preloadedResponse;
         }
       }
       
-      // 检查缓存
-      if (shouldCache(config) && config.cacheAdapter) {
-        const cacheKey = generateCacheKey(config);
-        const cachedResponse = await config.cacheAdapter.get(cacheKey);
-        
-        if (cachedResponse) {
-          // 检查是否强制使用缓存
-          if (config.cache === 'only-if-cached') {
+      // 检查缓存 - 使用处理后的finalConfig确保缓存键一致
+      if (shouldCache(finalConfig) && finalConfig.cacheAdapter) {
+        const cacheKey = generateCacheKey(finalConfig);
+        console.log(`缓存键: ${cacheKey}, URL: ${finalConfig.url}, 缓存模式: ${finalConfig.cache}`);
+        console.log(`参数:`, finalConfig.params);
+
+        try {
+          const cachedResponse = await finalConfig.cacheAdapter.get(cacheKey);
+          
+          if (cachedResponse) {
+            // 缓存命中日志，有助于调试
+            console.log(`✅ 缓存命中: ${finalConfig.url}, 缓存模式: ${finalConfig.cache}`);
+            
+            // 修复: 使用当前请求的config替换或合并缓存的config
+            // 这保证了用户在请求拦截器中添加的自定义属性能够保留到响应拦截器
+            cachedResponse.config = finalConfig;
+            
+            // 检查是否强制使用缓存
+            if (finalConfig.cache === 'only-if-cached') {
+              return cachedResponse;
+            }
+            
+            // 在后台刷新缓存，但仅当cache !== 'force-cache'时
+            if (finalConfig.cache !== 'force-cache') {
+              setTimeout(() => {
+                this.refreshCache(finalConfig, cacheKey).catch(err => {
+                  console.error('后台刷新缓存失败:', err);
+                });
+              }, 10);
+            }
+            
             return cachedResponse;
+          } else {
+            // 缓存未命中日志，有助于调试
+            console.log(`缓存未命中: ${finalConfig.url}, 缓存模式: ${finalConfig.cache}`);
           }
-          
-          // 在后台刷新缓存，但仅当cache !== 'force-cache'时
-          if (config.cache !== 'force-cache') {
-            setTimeout(() => {
-              this.refreshCache(config, cacheKey).catch(err => {
-                console.error('后台刷新缓存失败:', err);
-              });
-            }, 10);
-          }
-          
-          return cachedResponse;
+        } catch (err) {
+          console.error('读取缓存失败:', err);
         }
       }
       
-      // 没有缓存，发送实际请求
-      return this.performRequest(config);
+      // 没有缓存，发送实际请求，传入处理后的finalConfig
+      return this.performRequest(finalConfig);
     } catch (error) {
       console.error('WxRequest.sendRequest调用失败:', error);
       return Promise.reject(error);
@@ -367,20 +385,12 @@ export default class WxRequest {
     // 合并默认配置和请求配置
     const finalConfig = deepMerge(this.defaults, config) as RequestConfig;
 
-    // 构建完整URL
-    if (finalConfig.baseURL && finalConfig.url && !finalConfig.url.startsWith('http')) {
-      finalConfig.url = buildURL(finalConfig.baseURL, finalConfig.url);
-    }
-
-    // 合并URL参数
-    if (finalConfig.params && finalConfig.url) {
-      const queryString = Object.keys(finalConfig.params)
-        .map(key => `${encodeURIComponent(key)}=${encodeURIComponent(finalConfig.params![key])}`)
-        .join('&');
+    // 构建完整URL, 包含params参数
+    if (finalConfig.url) {
+      finalConfig.url = buildURL(finalConfig.url, finalConfig.baseURL, finalConfig.params);
       
-      if (queryString) {
-        finalConfig.url = `${finalConfig.url}${finalConfig.url.includes('?') ? '&' : '?'}${queryString}`;
-      }
+      // 在URL中添加了params后，保留原始params用于缓存键生成
+      // 不要删除这一行，它对缓存键的正确生成很重要
     }
 
     // 确保请求适配器存在
@@ -404,23 +414,18 @@ export default class WxRequest {
   private async performRequest(config: RequestConfig): Promise<Response> {
     // 定义直接执行请求的函数
     const directExecute = async (): Promise<Response> => {
-      // 准备最终请求配置
-      const finalConfig = this.prepareFinalConfig(config);
-      
-      // 使用适配器发送请求
-      const adapter = finalConfig.requestAdapter || wxRequestAdapter;
-      
       try {
-        // 发送请求
-        const response = await adapter(finalConfig);
+        // 使用适配器发送请求
+        const adapter = config.requestAdapter || wxRequestAdapter;
+        const response = await adapter(config);
         
         // 缓存响应
-        this.cacheResponse(finalConfig, response);
+        this.cacheResponse(config, response);
         
         return response;
       } catch (error) {
         // 处理错误和重试
-        return this.handleRequestError(error as RequestError, finalConfig);
+        return this.handleRequestError(error as RequestError, config);
       }
     };
     

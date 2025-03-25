@@ -98,20 +98,42 @@ export function serializeParams(params: Record<string, any>): string {
 
 /**
  * 生成缓存键
+ * @param config 请求配置
+ * @returns 缓存键
  */
 export function generateCacheKey(config: RequestConfig): string {
+  const { url = '', method = 'GET', params, data } = config;
+  
+  // 如果配置中提供了自定义缓存键，直接使用
   if (config.cacheKey) {
     return config.cacheKey;
   }
   
-  const { url, method = 'GET', params, data } = config;
-  const baseKey = `${method}:${url}`;
+  // 基础缓存键
+  let cacheKey = `${method}:${url}`;
   
-  // 简单处理，实际场景可能需要更复杂的算法
-  const paramsKey = params ? `:${JSON.stringify(sortObjectKeys(params))}` : '';
-  const dataKey = data ? `:${JSON.stringify(sortObjectKeys(data))}` : '';
+  // 添加查询参数(如果有)
+  if (params && Object.keys(params).length > 0) {
+    cacheKey += `:params:${JSON.stringify(sortObjectKeys(params))}`;
+  }
   
-  return `${baseKey}${paramsKey}${dataKey}`;
+  // 添加请求数据
+  if (data !== undefined) {
+    try {
+      // 对于对象数据，排序后再序列化，确保一致性
+      if (typeof data === 'object' && data !== null) {
+        cacheKey += `:data:${JSON.stringify(sortObjectKeys(data))}`;
+      } else {
+        cacheKey += `:data:${String(data)}`;
+      }
+    } catch (e) {
+      // 如果数据无法序列化，使用简单的字符串表示
+      cacheKey += `:data:${String(data)}`;
+    }
+  }
+  
+  // 使用哈希算法减小缓存键长度
+  return sha256(cacheKey);
 }
 
 /**
@@ -377,4 +399,24 @@ export function getValueByPath(obj: any, path: string, defaultValue: any = undef
   }
   
   return result === undefined ? defaultValue : result;
+}
+
+/**
+ * 简单的字符串哈希函数，生成固定长度哈希
+ * 注意：这不是真正的SHA-256，仅用于缓存键生成
+ * @param str 要哈希的字符串
+ * @returns 哈希字符串
+ */
+export function sha256(str: string): string {
+  let hash = 0;
+  if (str.length === 0) return hash.toString(36);
+  
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // 转换为32位整数
+  }
+  
+  // 转换为36进制并返回固定长度字符串
+  return Math.abs(hash).toString(36).padStart(8, '0');
 } 

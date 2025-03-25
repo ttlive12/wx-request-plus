@@ -307,7 +307,7 @@ wxRequest.get('/products', {
 | 参数 | 类型 | 描述 | 默认值 |
 | --- | --- | --- | --- |
 | baseURL | string | 请求的基础URL | '' |
-| timeout | number | 超时时间(ms) | 30000 |
+| timeout | number | 超时时间(ms) | 10000 |
 | headers | object | 默认请求头 | {'Content-Type': 'application/json'} |
 | maxCacheSize | number | 最大缓存条目数 | 100 |
 | maxCacheAge | number | 默认缓存过期时间(ms) | 5分钟 |
