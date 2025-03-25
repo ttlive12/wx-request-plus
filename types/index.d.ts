@@ -77,13 +77,11 @@ declare const request: {
     <T = any>(url: string, config?: import("./types").RequestConfig & {
         returnData: false;
     }): Promise<import("./types").Response<T>>;
-}, preRequest: (config: import("./types").RequestConfig & {
-    preloadKey: string;
-}) => Promise<void>, all: {
+}, all: {
     <T>(requests: Array<Promise<T>>): Promise<T[]>;
     <T extends any[]>(requests: [...{ [K in keyof T]: Promise<T[K]>; }]): Promise<T>;
 }, spread: <T, R>(callback: (...args: T[]) => R) => (arr: T[]) => R;
-export { defaultInstance as wxRequest, request, get, post, put, deleteMethod as delete, head, options, all, spread, preRequest };
+export { defaultInstance as wxRequest, request, get, post, put, deleteMethod as delete, head, options, all, spread, };
 export declare const interceptors: {
     request: import("./interceptor").default<import("./types").RequestConfig>;
     response: import("./interceptor").default<import("./types").Response>;

@@ -1,7 +1,7 @@
 // @ts-nocheck
 import wxRequest from "./request";
 
-const { get, preRequest, all } = wxRequest;
+const { get, all } = wxRequest;
 
 /***
  * GET请求1
@@ -30,17 +30,4 @@ export const getDeckStatsAndRankDetails = async () => {
     ans1,
     ans1,
   };
-};
-
-/**
- * 预请求
- */
-export const preloadDeckDetails = async (...args) => {
-  preRequest({
-    url: `/test4`,
-    preloadKey: JSON.stringify(args),
-    expireTime: 600000,
-  });
-
-  return true;
 };

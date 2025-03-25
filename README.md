@@ -279,27 +279,6 @@ wxRequest.cancelRequests(config => config.url.includes('/users'));
 wxRequest.cancelAll();
 ```
 
-### 预请求支持
-
-提前加载数据，在用户实际需要时立即提供，提升用户体验。
-
-```typescript
-// 预加载数据
-wxRequest.preRequest({
-  url: '/products',
-  preloadKey: 'hotProducts',  // 预加载键
-  expireTime: 60000           // 预加载数据有效期
-});
-
-// 实际使用时直接获取预加载的数据
-wxRequest.get('/products', { 
-  preloadKey: 'hotProducts'  // 使用预加载的数据
-})
-.then(res => {
-  console.log('立即获取预加载数据:', res.data);
-});
-```
-
 ## API文档
 
 ### 配置选项

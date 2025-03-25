@@ -18,7 +18,7 @@ export { ErrorType };
 const defaultInstance = new WxRequest();
 
 // 将请求方法添加到默认实例
-const { request, get, post, put, delete: deleteMethod, head, options, preRequest, all, spread } = defaultInstance;
+const { request, get, post, put, delete: deleteMethod, head, options, all, spread } = defaultInstance;
 
 // 导出方法
 export {
@@ -32,7 +32,6 @@ export {
   options,
   all,
   spread,
-  preRequest
 };
 
 // 导出拦截器

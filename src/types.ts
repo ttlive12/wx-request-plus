@@ -159,12 +159,6 @@ export interface NetworkStatus {
   signalStrength?: number; // 信号强度，范围0-100
 }
 
-// 预请求配置
-export interface PreRequestConfig extends RequestConfig {
-  preloadKey: string;  // 预加载键
-  expireTime?: number; // 过期时间
-}
-
 // 状态监控数据
 export interface MonitorData {
   totalRequests: number;

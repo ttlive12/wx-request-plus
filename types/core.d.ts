@@ -8,7 +8,6 @@ export default class WxRequest {
     };
     private cacheAdapter;
     private requestQueue;
-    private preloadManager;
     static create(config?: WxRequestConfig): WxRequest;
     constructor(config?: WxRequestConfig);
     request<T = any>(config: RequestConfig & {
@@ -82,14 +81,6 @@ export default class WxRequest {
     options<T = any>(url: string, config?: RequestConfig & {
         returnData: false;
     }): Promise<Response<T>>;
-    preRequest(config: RequestConfig & {
-        preloadKey: string;
-    }): Promise<void>;
-    getNetworkStatus(): Promise<{
-        isConnected: boolean;
-        networkType: string;
-        signalStrength?: number;
-    }>;
     clearCache(): Promise<void>;
     cancelRequests(filter: (config: RequestConfig) => boolean): void;
     getStatus(): {
@@ -98,10 +89,6 @@ export default class WxRequest {
             processingSize: number;
             offlineQueueSize: number;
             isNetworkAvailable: boolean;
-        };
-        preload: {
-            count: number;
-            keys: string[];
         };
     };
     cancelAll(): void;

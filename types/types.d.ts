@@ -114,10 +114,6 @@ export interface NetworkStatus {
     networkType: 'wifi' | '2g' | '3g' | '4g' | '5g' | 'unknown' | 'none';
     signalStrength?: number;
 }
-export interface PreRequestConfig extends RequestConfig {
-    preloadKey: string;
-    expireTime?: number;
-}
 export interface MonitorData {
     totalRequests: number;
     successRequests: number;

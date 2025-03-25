@@ -10,7 +10,6 @@ import Interceptor from './interceptor';
 import LRUCacheAdapter from './cache';
 import wxRequestAdapter from './wx-request';
 import RequestQueue from './queue';
-import PreloadManager from './preload';
 import {
   deepMerge,
   buildURL,
@@ -38,7 +37,6 @@ export default class WxRequest {
   // 组件管理器
   private cacheAdapter: LRUCacheAdapter;
   private requestQueue: RequestQueue;
-  private preloadManager: PreloadManager;
   
   /**
    * 静态工厂方法，创建WxRequest实例
@@ -85,8 +83,6 @@ export default class WxRequest {
       enableOfflineQueue: this.defaults.enableOfflineQueue
     });
     
-    this.preloadManager = new PreloadManager();
-    
     // 初始化拦截器
     this.interceptors = {
       request: new Interceptor<RequestConfig>(),
@@ -101,7 +97,6 @@ export default class WxRequest {
     this.delete = this.delete.bind(this);
     this.head = this.head.bind(this);
     this.options = this.options.bind(this);
-    this.preRequest = this.preRequest.bind(this);
     this.clearCache = this.clearCache.bind(this);
     this.cancelRequests = this.cancelRequests.bind(this);
     this.getStatus = this.getStatus.bind(this);
@@ -318,14 +313,6 @@ export default class WxRequest {
     try {
       // 准备最终配置，确保URL和参数已经处理完毕，这样生成的缓存键才一致
       const finalConfig = this.prepareFinalConfig(config);
-      
-      // 检查是否有预加载响应
-      if (finalConfig.preloadKey && this.preloadManager.hasPreloadResponse(finalConfig.preloadKey)) {
-        const preloadedResponse = this.preloadManager.getPreloadResponse(finalConfig.preloadKey);
-        if (preloadedResponse) {
-          return preloadedResponse;
-        }
-      }
       
       // 检查缓存 - 使用处理后的finalConfig确保缓存键一致
       if (shouldCache(finalConfig) && finalConfig.cacheAdapter) {
@@ -721,28 +708,6 @@ export default class WxRequest {
   }
   
   /**
-   * 预请求
-   * @param config 预请求配置
-   */
-  preRequest(config: RequestConfig & { preloadKey: string }): Promise<void> {
-    if (!this || !this.preloadManager) {
-      throw new Error('WxRequest实例的this上下文丢失。请使用wxRequest.preRequest()的方式调用，或使用bind绑定上下文。');
-    }
-    return this.preloadManager.preload(config, this.request.bind(this));
-  }
-  
-  /**
-   * 获取网络状态
-   */
-  getNetworkStatus(): Promise<{
-    isConnected: boolean;
-    networkType: string;
-    signalStrength?: number;
-  }> {
-    return getNetworkStatus();
-  }
-  
-  /**
    * 清除缓存
    * @param pattern 缓存键模式（暂未实现）
    */
@@ -768,12 +733,11 @@ export default class WxRequest {
    * 获取请求库状态
    */
   getStatus() {
-    if (!this || !this.requestQueue || !this.preloadManager) {
+    if (!this || !this.requestQueue) {
       throw new Error('WxRequest实例的this上下文丢失。请使用wxRequest.getStatus()的方式调用，或使用bind绑定上下文。');
     }
     return {
-      queue: this.requestQueue.getStatus(),
-      preload: this.preloadManager.getStatus()
+      queue: this.requestQueue.getStatus()
     };
   }
   
